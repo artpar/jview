@@ -1,0 +1,105 @@
+#import <Cocoa/Cocoa.h>
+#include "app.h"
+
+// Map from surfaceID → NSWindow
+static NSMutableDictionary<NSString*, NSWindow*> *windowMap = nil;
+
+@interface JVAppDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation JVAppDelegate
+
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    // Activate the app and bring to front
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    [NSApp activateIgnoringOtherApps:YES];
+}
+
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
+    return YES;
+}
+
+@end
+
+void JVAppInit(void) {
+    [NSApplication sharedApplication];
+    windowMap = [[NSMutableDictionary alloc] init];
+
+    JVAppDelegate *delegate = [[JVAppDelegate alloc] init];
+    [NSApp setDelegate:delegate];
+
+    // Create a basic menu bar
+    NSMenu *menuBar = [[NSMenu alloc] init];
+    NSMenuItem *appMenuItem = [[NSMenuItem alloc] init];
+    [menuBar addItem:appMenuItem];
+    [NSApp setMainMenu:menuBar];
+
+    NSMenu *appMenu = [[NSMenu alloc] init];
+    NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit jview"
+                                                      action:@selector(terminate:)
+                                               keyEquivalent:@"q"];
+    [appMenu addItem:quitItem];
+    [appMenuItem setSubmenu:appMenu];
+}
+
+void JVAppRun(void) {
+    [NSApp run];
+}
+
+void* JVCreateWindow(const char* title, int width, int height, const char* surfaceID) {
+    NSString *sid = [NSString stringWithUTF8String:surfaceID];
+    NSString *windowTitle = [NSString stringWithUTF8String:title];
+
+    NSRect frame = NSMakeRect(0, 0, width, height);
+    NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |
+                                   NSWindowStyleMaskClosable |
+                                   NSWindowStyleMaskMiniaturizable |
+                                   NSWindowStyleMaskResizable;
+
+    NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
+                                                   styleMask:styleMask
+                                                     backing:NSBackingStoreBuffered
+                                                       defer:NO];
+    [window setTitle:windowTitle];
+    [window center];
+    [window makeKeyAndOrderFront:nil];
+
+    windowMap[sid] = window;
+    return (__bridge void*)window;
+}
+
+void JVDestroyWindow(const char* surfaceID) {
+    NSString *sid = [NSString stringWithUTF8String:surfaceID];
+    NSWindow *window = windowMap[sid];
+    if (window) {
+        [window close];
+        [windowMap removeObjectForKey:sid];
+    }
+}
+
+void JVSetWindowRootView(const char* surfaceID, void* view) {
+    NSString *sid = [NSString stringWithUTF8String:surfaceID];
+    NSWindow *window = windowMap[sid];
+    if (!window) return;
+
+    NSView *nsView = (__bridge NSView*)view;
+    nsView.translatesAutoresizingMaskIntoConstraints = NO;
+
+    // Remove existing subviews
+    NSView *contentView = window.contentView;
+    for (NSView *sub in [contentView.subviews copy]) {
+        [sub removeFromSuperview];
+    }
+
+    [contentView addSubview:nsView];
+
+    // Pin root view: top, leading, trailing fixed; bottom with low priority so
+    // content sizes naturally from the top and fills width
+    NSLayoutConstraint *bottom = [nsView.bottomAnchor constraintLessThanOrEqualToAnchor:contentView.bottomAnchor];
+    [NSLayoutConstraint activateConstraints:@[
+        [nsView.topAnchor constraintEqualToAnchor:contentView.topAnchor],
+        [nsView.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
+        [nsView.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
+        bottom,
+    ]];
+}

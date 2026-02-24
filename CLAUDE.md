@@ -1,0 +1,213 @@
+# jview — Native macOS A2UI Renderer
+
+## What This Is
+Go + CGo + Objective-C app that renders A2UI JSONL protocol as native Cocoa/AppKit widgets. No webview, no Electron.
+
+## Testing & Verification
+
+### The Gate: `make check`
+```
+make check
+```
+This is the single command that validates everything. Run it before any commit. It runs two stages in order:
+
+1. **`make test`** — headless unit + integration tests (no display needed)
+2. **`make verify`** — build binary, launch every fixture, capture screenshots
+
+If stage 1 fails, stage 2 doesn't run. Both must pass.
+
+### Three Layers of Testing
+
+#### Layer 1: Unit Tests (headless, fast, CI-safe)
+```
+make test
+```
+Pure Go tests against protocol/, engine/ with mock renderer. No CGo, no AppKit, no display.
+
+**What they cover:**
+- Protocol parsing: every message type, dynamic values, child lists, edge cases
+- DataModel: JSON Pointer get/set/delete, nested paths, missing keys
+- BindingTracker: registration, unregistration, path overlap detection
+- Tree: update, root detection, child ordering, change tracking
+- Render ordering: topological sort guarantees children created before parents
+- Data binding: TextField → DataModel → bound Text propagation
+- CheckBox binding: toggle → DataModel → bound components
+- Button callbacks: onClick fires ActionHandler with correct action name
+- DataModel updates: updateDataModel message triggers re-render of bound components
+
+**How they work:**
+- `renderer/mock.go` provides `MockRenderer` (records all ops) and `MockDispatcher` (runs synchronously)
+- Engine tests feed JSONL strings to Session and assert on MockRenderer's recorded state
+- E2E tests read actual `testdata/*.jsonl` files through FileTransport → Session → MockRenderer
+
+**Where to add tests:**
+- New protocol feature → `protocol/parse_test.go`
+- New engine logic → `engine/*_test.go` for the unit, `engine/integration_test.go` for the flow
+- New component → add a case to an integration test that creates the component and checks resolved props
+- New data binding pattern → `engine/integration_test.go` with InvokeCallback + assert Updated
+
+#### Layer 2: Screenshot Verification (requires macOS display)
+```
+make verify
+```
+Builds the real binary, launches each `testdata/*.jsonl` fixture, waits 2 seconds, captures `build/screenshots/<name>.png`, kills the process.
+
+**What it catches:** CGo bridge failures, ObjC crashes, layout bugs, visual regressions — things unit tests can't see.
+
+**What to check in screenshots:**
+- **hello.png**: Card titled "Welcome" with h1 "Hello, jview!" and body text
+- **contact_form.png**: Column with h2 heading, Name/Email labels+fields, Preview card, checkbox, blue Submit button
+- **layout.png**: h1 heading, horizontal Row with two Cards side-by-side
+
+**Single fixture:**
+```
+make verify-fixture F=testdata/hello.jsonl
+```
+
+#### Layer 3: Interactive Testing (manual, for binding/callback work)
+```
+build/jview testdata/contact_form.jsonl
+```
+Window stays open. Type in fields, click buttons, toggle checkboxes. Quit with Cmd+Q.
+
+**When to do this:** after changing callback flow, data binding, or adding interactive components.
+
+### Fixture Discipline
+
+Every component and every feature gets a fixture in `testdata/`. Fixtures are:
+- The **test data** for headless E2E tests (engine/e2e_test.go reads them)
+- The **input** for screenshot verification
+- The **demo** for interactive testing
+
+**When adding a new component:**
+1. Create `testdata/<component>.jsonl` with the component in a realistic layout
+2. Add an E2E test in `engine/e2e_test.go` that reads the fixture and asserts on MockRenderer
+3. Run `make check` — headless tests pass, screenshot captured
+4. Read the screenshot — visual output is correct
+
+**When adding a new engine feature (e.g., function calls):**
+1. Create `testdata/<feature>.jsonl` exercising the feature
+2. Add integration test in `engine/integration_test.go` with inline JSONL
+3. Add E2E test reading the fixture
+4. `make check`
+
+### Test File Map
+
+| File | What it tests | Layer |
+|------|--------------|-------|
+| `protocol/parse_test.go` | JSONL parsing, message types, dynamic values | Unit |
+| `engine/datamodel_test.go` | JSON Pointer operations | Unit |
+| `engine/binding_test.go` | Path → component tracking, overlap | Unit |
+| `engine/tree_test.go` | Component hierarchy, roots, children | Unit |
+| `engine/integration_test.go` | Session + Surface with mock renderer | Integration |
+| `engine/e2e_test.go` | Full pipeline: file → transport → engine → mock | E2E |
+| `renderer/mock.go` | MockRenderer + MockDispatcher | Test infra |
+| `testdata/*.jsonl` | Fixture files used by E2E + screenshots | Data |
+
+## Architecture
+
+```
+Transport (goroutine)          ← reads JSONL from file/SSE/WS
+    ↓
+engine.Session (goroutine)     ← routes messages to surfaces
+    ↓
+engine.Surface                 ← manages tree, data model, bindings
+    ↓
+Dispatcher.RunOnMain()         ← batches render ops to main thread
+    ↓
+darwin.Renderer (main thread)  ← CGo → ObjC → NSView creation/updates
+    ↓
+Native Cocoa widgets           ← visible on screen
+```
+
+## Layer Rules
+
+| Layer | May import | Must NOT import |
+|-------|-----------|----------------|
+| protocol/ | stdlib only | engine, renderer, platform |
+| engine/ | protocol, renderer | platform |
+| renderer/ | protocol | engine, platform |
+| platform/darwin/ | protocol, renderer | engine |
+| transport/ | protocol | engine, renderer, platform |
+| main.go | everything | — |
+
+## CGo Conventions
+- Every `.go` file with `import "C"` needs `#cgo CFLAGS: -x objective-c -fobjc-arc`
+- Each component = 3 files: `widget.go` + `widget.h` + `widget.m`
+- `callback.go` needs `#include <stdint.h>` for `C.uint64_t`
+- `cgo.Handle` is integer — pass to `C.uintptr_t` directly, never wrap in `unsafe.Pointer`
+- Use `objc_setAssociatedObject` to prevent target-action dealloc
+
+## Rendering Rules
+- Topological sort: create leaves before parents (children before containers)
+- Two-pass: (1) create/update all views, (2) set children on containers
+- Root view: pin top/leading/trailing tight, bottom with `constraintLessThanOrEqualToAnchor`
+- NSBox (Card): add stack to existing contentView, never replace contentView
+
+## Callback Flow
+1. Engine registers callback via `rend.RegisterCallback()` → gets CallbackID
+2. CallbackID stored in `RenderNode.Callbacks` map
+3. Component bridge reads from `node.Callbacks` during `CreateView`
+4. ObjC target calls `GoCallbackInvoke(callbackID, data)` → globalRegistry → Go func
+5. Two-way binding: callback writes to DataModel → BindingTracker finds affected components → re-render (skip self)
+
+## Adding a New Component
+
+1. Add type constant to `protocol/component.go`
+2. Add props fields to `protocol.Props`
+3. Add resolved fields to `renderer.ResolvedProps`
+4. Add resolver case in `engine/resolver.go`
+5. Create `platform/darwin/widget.go` + `.h` + `.m`
+6. Add switch cases in `darwin.DarwinRenderer.CreateView`, `UpdateView`, `SetChildren`
+7. Add callback registration in `engine/surface.go` if interactive
+8. Add testdata fixture, `make verify-fixture F=testdata/new.jsonl`, read screenshot
+
+## Roadmap
+
+Full roadmap tracked in planning MCP (plan: `jview Roadmap`). Summary:
+
+### Phase 1: MVP — COMPLETE
+Protocol parsing, engine core, 7 component bridges (Text, Row, Column, Card, Button, TextField, CheckBox), file transport, Makefile verify pipeline.
+
+### Phase 2: Full Interactivity + Remaining Components
+Engine completeness and all remaining form/display components.
+
+| Task | Tag | Priority | Depends on |
+|------|-----|----------|------------|
+| FunctionCall evaluator (14 built-in functions) | engine | high | — |
+| Validation checks engine | engine | high | — |
+| Dynamic ChildList template expansion | engine | high | — |
+| Divider | component | medium | — |
+| Slider | component | medium | — |
+| Image (async URL) | component | medium | — |
+| Icon (SF Symbols) | component | low | — |
+| ChoicePicker (dropdown/multi) | component | medium | — |
+| DateTimeInput | component | medium | — |
+| List (scrollable, templated) | component | medium | template expansion |
+
+### Phase 3: Media + Live Transport + Polish
+Live agent connectivity and remaining A2UI components.
+
+| Task | Tag | Priority | Depends on |
+|------|-----|----------|------------|
+| SSE transport | transport | critical | — |
+| WebSocket transport | transport | high | — |
+| Action response pipeline | transport | high | — |
+| Tabs | component | high | — |
+| Modal | component | high | — |
+| Video (AVPlayerView) | component | medium | — |
+| AudioPlayer | component | low | — |
+| Theme → NSAppearance | infra | low | — |
+| Scroll view for overflow | infra | medium | — |
+
+### Phase 4: Production Hardening
+Reliability, performance, packaging.
+
+| Task | Tag | Priority |
+|------|-----|----------|
+| CGo memory cleanup | infra | high |
+| Error recovery / graceful degradation | infra | high |
+| Multi-surface window management | infra | medium |
+| Incremental tree diff | infra | medium |
+| CLI flags + stdin transport | transport | medium |
+| macOS .app bundle packaging | infra | low |

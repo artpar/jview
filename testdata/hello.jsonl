@@ -1,0 +1,2 @@
+{"type":"createSurface","surfaceId":"main","title":"Hello jview","width":600,"height":400}
+{"type":"updateComponents","surfaceId":"main","components":[{"componentId":"card1","type":"Card","props":{"title":"Welcome"},"children":["heading","body"]},{"componentId":"heading","type":"Text","props":{"content":"Hello, jview!","variant":"h1"}},{"componentId":"body","type":"Text","props":{"content":"This is a native macOS A2UI renderer. No webview, no Electron — just real AppKit widgets driven by declarative JSON.","variant":"body"}}]}
