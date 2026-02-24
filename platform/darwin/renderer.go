@@ -98,6 +98,8 @@ func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode)
 		handle = createListView(node)
 	case protocol.CompTabs:
 		handle = createTabsView(node, surfaceID)
+	case protocol.CompModal:
+		handle = createModalView(node, surfaceID)
 	default:
 		log.Printf("darwin: unsupported component type %s", node.Type)
 		return 0
@@ -148,6 +150,8 @@ func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle
 		updateListView(handle, node)
 	case protocol.CompTabs:
 		updateTabsView(handle, node)
+	case protocol.CompModal:
+		updateModalView(handle, node)
 	default:
 		log.Printf("darwin: unsupported update for component type %s", node.Type)
 	}
@@ -167,6 +171,8 @@ func (r *DarwinRenderer) SetChildren(surfaceID string, parentHandle renderer.Vie
 		setListChildren(parentHandle, childHandles)
 	case protocol.CompTabs:
 		setTabsChildren(parentHandle, childHandles)
+	case protocol.CompModal:
+		setModalChildren(parentHandle, childHandles)
 	default:
 		log.Printf("darwin: SetChildren not supported for type %s", parentType)
 	}

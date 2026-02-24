@@ -83,6 +83,9 @@ type ResolvedProps struct {
 	// Tabs
 	TabLabels []string `json:"tabLabels,omitempty"`
 	ActiveTab string   `json:"activeTab,omitempty"`
+
+	// Modal
+	Visible bool `json:"visible,omitempty"`
 }
 
 // OptionItem represents a single option in a ChoicePicker.

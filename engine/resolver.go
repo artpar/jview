@@ -148,6 +148,13 @@ func (r *Resolver) Resolve(comp *protocol.Component) *renderer.RenderNode {
 		p.TabLabels = r.resolveTabLabels(cp.TabLabels)
 		p.ActiveTab = r.resolveString(comp.ComponentID, cp.ActiveTab)
 		p.DataBinding = cp.DataBinding
+
+	case protocol.CompModal:
+		p.Title = r.resolveString(comp.ComponentID, cp.Title)
+		p.Visible = r.resolveBool(comp.ComponentID, cp.Visible)
+		p.DataBinding = cp.DataBinding
+		p.Width = cp.Width
+		p.Height = cp.Height
 	}
 
 	node.Style = comp.Style

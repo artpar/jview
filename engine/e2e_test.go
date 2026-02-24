@@ -686,3 +686,142 @@ func TestE2EScopedComponentsFixture(t *testing.T) {
 		t.Errorf("c2 display after c1 increment = %q, want '100'", c2Node.Props.Content)
 	}
 }
+
+func TestE2EModalFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "modal.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout")
+	}
+
+	// Modal component created with correct resolved props
+	modalNode := mock.LastNode("modal", "modal1")
+	if modalNode == nil {
+		t.Fatal("modal1 not created")
+	}
+	if modalNode.Type != protocol.CompModal {
+		t.Errorf("modal1 type = %q, want Modal", modalNode.Type)
+	}
+	if modalNode.Props.Title != "My Modal" {
+		t.Errorf("modal1 title = %q, want 'My Modal'", modalNode.Props.Title)
+	}
+	if modalNode.Props.Visible != false {
+		t.Errorf("modal1 visible = %v, want false", modalNode.Props.Visible)
+	}
+
+	// Modal children created
+	contentHandle := mock.GetHandle("modal", "modalContent")
+	if contentHandle == 0 {
+		t.Error("modalContent not created")
+	}
+
+	// SetChildren called on modal
+	modalHandle := mock.GetHandle("modal", "modal1")
+	foundChildren := false
+	for _, cs := range mock.Children {
+		if cs.ParentHandle == modalHandle {
+			foundChildren = true
+			if len(cs.ChildHandles) != 1 {
+				t.Errorf("modal children = %d, want 1", len(cs.ChildHandles))
+			}
+		}
+	}
+	if !foundChildren {
+		t.Error("no SetChildren for modal1")
+	}
+
+	// Status shows "closed" initially
+	statusNode := mock.LastNode("modal", "status")
+	if statusNode == nil {
+		t.Fatal("status not created")
+	}
+	if statusNode.Props.Content != "Modal is closed" {
+		t.Errorf("status = %q, want 'Modal is closed'", statusNode.Props.Content)
+	}
+
+	// Click open button → visible becomes true
+	beforeUpdates := len(mock.Updated)
+	mock.InvokeCallback("modal", "openBtn", "click", "")
+
+	foundModal := false
+	foundStatus := false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "modal1" {
+			foundModal = true
+			if !u.Node.Props.Visible {
+				t.Errorf("modal1 visible after open = %v, want true", u.Node.Props.Visible)
+			}
+		}
+		if u.Node != nil && u.Node.ComponentID == "status" {
+			foundStatus = true
+			if u.Node.Props.Content != "Modal is open" {
+				t.Errorf("status after open = %q, want 'Modal is open'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !foundModal {
+		t.Error("modal1 not updated after open click")
+	}
+	if !foundStatus {
+		t.Error("status not updated after open click")
+	}
+
+	// Dismiss callback → visible becomes false
+	beforeUpdates = len(mock.Updated)
+	mock.InvokeCallback("modal", "modal1", "dismiss", "")
+
+	foundModal = false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "modal1" {
+			foundModal = true
+			if u.Node.Props.Visible {
+				t.Errorf("modal1 visible after dismiss = %v, want false", u.Node.Props.Visible)
+			}
+		}
+	}
+	if !foundModal {
+		t.Error("modal1 not updated after dismiss")
+	}
+}
+
+func TestE2EModalTests(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+
+	results, err := RunTestFile(filepath.Join(fixtureDir(), "modal_test.jsonl"), mock, disp)
+	if err != nil {
+		t.Fatalf("RunTestFile: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("no tests found in modal_test.jsonl")
+	}
+
+	passed := 0
+	totalAssertions := 0
+	for _, r := range results {
+		totalAssertions += r.Assertions
+		if r.Passed {
+			passed++
+		} else {
+			t.Errorf("FAIL: %s: %s", r.Name, r.Error)
+		}
+	}
+
+	t.Logf("%d/%d tests passed, %d assertions total", passed, len(results), totalAssertions)
+}

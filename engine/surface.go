@@ -531,6 +531,43 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 			node.Callbacks["select"] = cbID
 			s.trackCallback(comp.ComponentID, "select", cbID)
 		}
+
+	case protocol.CompModal:
+		binding := comp.Props.DataBinding
+		compID := comp.ComponentID
+		onDismiss := comp.Props.OnDismiss
+		cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "dismiss", func(data string) {
+			var allChanged []string
+			if binding != "" {
+				changed, err := s.dm.Set(binding, false)
+				if err != nil {
+					log.Printf("surface %s: modal binding error: %v", s.id, err)
+				} else {
+					allChanged = append(allChanged, changed...)
+				}
+			}
+			if onDismiss != nil && onDismiss.Action != nil {
+				if onDismiss.Action.Event != nil {
+					resolved := s.resolveDataRefs(onDismiss.Action.Event)
+					if s.ActionHandler != nil {
+						s.ActionHandler(s.id, onDismiss.Action.Event, resolved)
+					}
+				} else if onDismiss.Action.FunctionCall != nil {
+					s.executeFunctionCall(onDismiss.Action.FunctionCall)
+				}
+			}
+			affected := s.tracker.Affected(allChanged)
+			var toRender []string
+			for _, id := range affected {
+				if id != compID {
+					toRender = append(toRender, id)
+				}
+			}
+			toRender = append(toRender, compID)
+			s.renderComponents(toRender)
+		})
+		node.Callbacks["dismiss"] = cbID
+		s.trackCallback(comp.ComponentID, "dismiss", cbID)
 	}
 }
 
@@ -884,6 +921,7 @@ func (s *Surface) rewritePaths(comp *protocol.Component, itemVar string, itemPat
 	rewriteBool(p.EnableDate)
 	rewriteBool(p.EnableTime)
 	rewriteBool(p.MutuallyExclusive)
+	rewriteBool(p.Visible)
 
 	// Rewrite data binding
 	if p.DataBinding != "" {

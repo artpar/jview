@@ -49,7 +49,7 @@ func a2uiTools() []anyllm.Tool {
 								"type": "object",
 								"properties": map[string]any{
 									"componentId": map[string]any{"type": "string"},
-									"type":        map[string]any{"type": "string", "enum": []string{"Text", "Row", "Column", "Card", "Button", "TextField", "CheckBox", "Slider", "Image", "Icon", "Divider", "List", "Tabs", "ChoicePicker", "DateTimeInput"}},
+									"type":        map[string]any{"type": "string", "enum": []string{"Text", "Row", "Column", "Card", "Button", "TextField", "CheckBox", "Slider", "Image", "Icon", "Divider", "List", "Tabs", "Modal", "ChoicePicker", "DateTimeInput"}},
 									"children":    map[string]any{"type": "object", "description": "Tree structure: {\"static\": [\"childId1\", \"childId2\"]}. Required on containers."},
 									"props":       map[string]any{"type": "object"},
 									"style": map[string]any{
@@ -391,6 +391,7 @@ AVAILABLE COMPONENTS:
 - Divider: Visual separator. No props needed.
 - List: Scrollable list container.
 - Tabs: Tabbed container showing one child at a time. Props: tabLabels (array of strings, one per child), activeTab (child ID of selected tab), dataBinding (JSON pointer to store selected child ID). Children define tab content.
+- Modal: Floating panel window. Props: title (string), visible (bool or data binding), dataBinding (JSON pointer for two-way visible binding), width (int), height (int), onDismiss (action). Children define modal content. When dismissed, dataBinding is set to false.
 - ChoicePicker: Dropdown/selection. Props: options (array of {value, label}), dataBinding (JSON pointer), mutuallyExclusive (bool)
 - DateTimeInput: Date/time picker. Props: enableDate (bool), enableTime (bool), dataBinding (JSON pointer)
 
