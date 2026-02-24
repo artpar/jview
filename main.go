@@ -31,6 +31,8 @@ func main() {
 	mode := flag.String("mode", "tools", "LLM mode: tools (default) or raw")
 	apiKey := flag.String("api-key", "", "API key (overrides environment variable)")
 	promptFile := flag.String("prompt-file", "", "Read prompt from file (overrides --prompt)")
+	regenerate := flag.Bool("regenerate", false, "Force fresh LLM call, ignore cache")
+	generateOnly := flag.Bool("generate-only", false, "Generate JSONL and exit without opening a window")
 	flag.Parse()
 
 	if *promptFile != "" {
@@ -42,46 +44,119 @@ func main() {
 		*prompt = string(data)
 	}
 
-	// Initialize platform
-	darwin.AppInit()
-	disp := darwin.NewDispatcher()
-	rend := darwin.NewRenderer()
-
-	// Create session
-	sess := engine.NewSession(rend, disp)
+	if *generateOnly && *promptFile == "" {
+		fmt.Fprintf(os.Stderr, "error: --generate-only requires --prompt-file\n")
+		os.Exit(1)
+	}
 
 	var tr transport.Transport
+	var generateDone chan struct{} // closed when generate-only can exit
 
 	args := flag.Args()
 	if len(args) > 0 && *prompt == "" {
 		// File mode: positional arg with no --prompt
 		tr = transport.NewFileTransport(args[0])
 	} else if *prompt != "" {
-		// LLM mode
-		provider, err := createProvider(*llmProvider, *apiKey)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
+		// Check cache for prompt-file mode
+		if *promptFile != "" && !*regenerate && transport.CacheValid(*promptFile) {
+			jsonlPath, _, _ := transport.CachePaths(*promptFile)
+			if *generateOnly {
+				log.Printf("cache hit: %s (up to date)", jsonlPath)
+				os.Exit(0)
+			}
+			log.Printf("cache hit: using %s", jsonlPath)
+			tr = transport.NewFileTransport(jsonlPath)
+		} else {
+			// LLM mode (cache miss or no prompt-file)
+			provider, err := createProvider(*llmProvider, *apiKey)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				os.Exit(1)
+			}
 
-		lt := transport.NewLLMTransport(transport.LLMConfig{
-			Provider: provider,
-			Model:    *model,
-			Prompt:   *prompt,
-			Mode:     *mode,
-		})
-		tr = lt
+			cfg := transport.LLMConfig{
+				Provider: provider,
+				Model:    *model,
+				Prompt:   *prompt,
+				Mode:     *mode,
+			}
 
-		// Wire actions from engine back to transport
-		sess.OnAction = func(surfaceID string, action *protocol.Action, data map[string]interface{}) {
-			lt.SendAction(surfaceID, action, data)
+			// Set up recording if using prompt-file
+			if *promptFile != "" {
+				_, _, tmpPath := transport.CachePaths(*promptFile)
+				cfg.RecordTo = tmpPath
+			}
+
+			lt := transport.NewLLMTransport(cfg)
+
+			// Finalize cache on first turn completion
+			if *promptFile != "" {
+				jsonlPath, _, tmpPath := transport.CachePaths(*promptFile)
+				if *generateOnly {
+					generateDone = make(chan struct{})
+				}
+				lt.OnInitialTurnDone = func() {
+					lt.CloseRecorder()
+					if err := os.Rename(tmpPath, jsonlPath); err != nil {
+						log.Printf("cache: rename failed: %v", err)
+					} else {
+						log.Printf("cache: wrote %s", jsonlPath)
+					}
+					if err := transport.WriteHashFile(*promptFile); err != nil {
+						log.Printf("cache: write hash failed: %v", err)
+					}
+					if generateDone != nil {
+						close(generateDone)
+					}
+				}
+			}
+
+			tr = lt
 		}
 	} else {
 		fmt.Fprintf(os.Stderr, "usage: jview <file.jsonl>\n")
 		fmt.Fprintf(os.Stderr, "       jview --prompt \"Build a todo app\"\n")
 		fmt.Fprintf(os.Stderr, "       jview --prompt-file prompt.txt\n")
 		fmt.Fprintf(os.Stderr, "       jview --llm openai --model gpt-4o --prompt-file prompt.txt\n")
+		fmt.Fprintf(os.Stderr, "       jview --prompt-file prompt.txt --generate-only\n")
 		os.Exit(1)
+	}
+
+	// Generate-only mode: drain messages without AppKit
+	if *generateOnly {
+		go func() {
+			tr.Start()
+			for {
+				select {
+				case _, ok := <-tr.Messages():
+					if !ok {
+						return
+					}
+				case _, ok := <-tr.Errors():
+					if !ok {
+						return
+					}
+				}
+			}
+		}()
+		if generateDone != nil {
+			<-generateDone
+		}
+		tr.Stop()
+		return
+	}
+
+	// Interactive mode: initialize platform and engine
+	darwin.AppInit()
+	disp := darwin.NewDispatcher()
+	rend := darwin.NewRenderer()
+	sess := engine.NewSession(rend, disp)
+
+	// Wire actions for LLM transport
+	if lt, ok := tr.(*transport.LLMTransport); ok {
+		sess.OnAction = func(surfaceID string, action *protocol.Action, data map[string]interface{}) {
+			lt.SendAction(surfaceID, action, data)
+		}
 	}
 
 	// Process messages in a goroutine

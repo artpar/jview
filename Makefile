@@ -5,7 +5,8 @@ FIXTURES  := $(wildcard testdata/*.jsonl)
 SNAP_WAIT := 2
 GO        ?= $(shell command -v go1.25.0 2>/dev/null || echo go)
 
-.PHONY: build test verify verify-fixture check clean
+.PHONY: build test verify verify-fixture check clean \
+       generate-apps generate-app run-app regen-app clean-apps
 
 # ── Build ───────────────────────────────────────────
 build:
@@ -58,6 +59,33 @@ verify-fixture: build
 # This is the gate. Run before any commit.
 check: test verify
 	@echo "\n✓ All tests passed. All fixtures rendered. Review screenshots."
+
+# ── Sample Apps ─────────────────────────────────────
+SAMPLE_APPS := $(wildcard sample_apps/*/prompt.txt)
+
+# Generate all sample apps (headless, no window)
+generate-apps: build
+	@for f in $(SAMPLE_APPS); do \
+		name=$$(basename $$(dirname $$f)); \
+		echo "==> generating $$name"; \
+		$(BUILD_DIR)/$(BINARY) --prompt-file $$f --generate-only; \
+	done
+
+# Generate a single sample app: make generate-app A=calculator
+generate-app: build
+	$(BUILD_DIR)/$(BINARY) --prompt-file sample_apps/$(A)/prompt.txt --generate-only
+
+# Run a sample app (opens window from cache or LLM): make run-app A=calculator
+run-app: build
+	$(BUILD_DIR)/$(BINARY) --prompt-file sample_apps/$(A)/prompt.txt
+
+# Force-regenerate a sample app: make regen-app A=calculator
+regen-app: build
+	$(BUILD_DIR)/$(BINARY) --prompt-file sample_apps/$(A)/prompt.txt --regenerate --generate-only
+
+# Remove all cached JSONL and hash files
+clean-apps:
+	rm -f sample_apps/*/*.jsonl sample_apps/*/*.jsonl.tmp sample_apps/*/.*.hash
 
 # ── Clean ───────────────────────────────────────────
 clean:

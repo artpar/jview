@@ -54,7 +54,7 @@ func TestToolCallToMessage(t *testing.T) {
 		},
 	}
 
-	msg, err := toolCallToMessage(tc)
+	msg, _, err := toolCallToMessage(tc)
 	if err != nil {
 		t.Fatalf("toolCallToMessage: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestToolCallToMessageUpdateComponents(t *testing.T) {
 		},
 	}
 
-	msg, err := toolCallToMessage(tc)
+	msg, _, err := toolCallToMessage(tc)
 	if err != nil {
 		t.Fatalf("toolCallToMessage: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestToolCallToMessageUnknownTool(t *testing.T) {
 			Arguments: "{}",
 		},
 	}
-	_, err := toolCallToMessage(tc)
+	_, _, err := toolCallToMessage(tc)
 	if err == nil {
 		t.Fatal("expected error for unknown tool")
 	}

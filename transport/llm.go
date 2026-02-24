@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"jview/protocol"
 	"log"
+	"os"
 	"strings"
 	"sync"
 
@@ -18,6 +19,7 @@ type LLMConfig struct {
 	Model    string
 	Prompt   string
 	Mode     string // "tools" (default) or "raw"
+	RecordTo string // path to write JSONL recording (empty = no recording)
 }
 
 type actionPayload struct {
@@ -36,6 +38,11 @@ type LLMTransport struct {
 	done     chan struct{}
 	stopOnce sync.Once
 	cancel   context.CancelFunc
+
+	recorder *os.File // lazily opened JSONL recorder
+	// OnInitialTurnDone is called after the first doTurn completes.
+	// Use this to finalize cache files.
+	OnInitialTurnDone func()
 }
 
 func NewLLMTransport(cfg LLMConfig) *LLMTransport {
@@ -79,6 +86,31 @@ func (t *LLMTransport) SendAction(surfaceID string, action *protocol.Action, dat
 	}
 }
 
+// recordLine writes a JSONL line to the recorder file. No-op if no RecordTo path.
+func (t *LLMTransport) recordLine(line []byte) {
+	if t.config.RecordTo == "" {
+		return
+	}
+	if t.recorder == nil {
+		f, err := os.Create(t.config.RecordTo)
+		if err != nil {
+			log.Printf("llm: failed to open recorder: %v", err)
+			return
+		}
+		t.recorder = f
+	}
+	t.recorder.Write(line)
+	t.recorder.Write([]byte("\n"))
+}
+
+// CloseRecorder closes the recording file if open.
+func (t *LLMTransport) CloseRecorder() {
+	if t.recorder != nil {
+		t.recorder.Close()
+		t.recorder = nil
+	}
+}
+
 func (t *LLMTransport) run() {
 	defer close(t.messages)
 	defer close(t.errors)
@@ -94,6 +126,7 @@ func (t *LLMTransport) run() {
 		{Role: anyllm.RoleUser, Content: t.config.Prompt},
 	}
 
+	firstTurn := true
 	for {
 		select {
 		case <-t.done:
@@ -104,6 +137,13 @@ func (t *LLMTransport) run() {
 		history = t.doTurn(ctx, history)
 		if history == nil {
 			return
+		}
+
+		if firstTurn {
+			firstTurn = false
+			if t.OnInitialTurnDone != nil {
+				t.OnInitialTurnDone()
+			}
 		}
 
 		// Wait for a user action to trigger the next turn
@@ -168,7 +208,7 @@ func (t *LLMTransport) doTurnTools(ctx context.Context, history []anyllm.Message
 		if len(choice.Message.ToolCalls) > 0 {
 			for _, tc := range choice.Message.ToolCalls {
 				log.Printf("llm: processing tool call: %s", tc.Function.Name)
-				msg, err := toolCallToMessage(tc)
+				msg, rawBytes, err := toolCallToMessage(tc)
 				if err != nil {
 					log.Printf("llm: tool call parse error: %v", err)
 					// Send error as tool result so the LLM knows
@@ -179,6 +219,8 @@ func (t *LLMTransport) doTurnTools(ctx context.Context, history []anyllm.Message
 					})
 					continue
 				}
+
+				t.recordLine(rawBytes)
 
 				select {
 				case t.messages <- msg:
@@ -256,6 +298,7 @@ func (t *LLMTransport) doTurnRaw(ctx context.Context, history []anyllm.Message) 
 				log.Printf("llm: raw parse skip: %v", err)
 				continue
 			}
+			t.recordLine([]byte(line))
 			select {
 			case t.messages <- msg:
 			case <-t.done:

@@ -116,18 +116,19 @@ func a2uiTools() []anyllm.Tool {
 }
 
 // toolCallToMessage converts a tool call into a protocol.Message by injecting the "type" field
-// and parsing through the standard protocol parser path.
-func toolCallToMessage(tc anyllm.ToolCall) (*protocol.Message, error) {
+// and parsing through the standard protocol parser path. Returns the parsed message and the
+// raw JSONL bytes (for recording).
+func toolCallToMessage(tc anyllm.ToolCall) (*protocol.Message, []byte, error) {
 	name := tc.Function.Name
 	if !strings.HasPrefix(name, "a2ui_") {
-		return nil, fmt.Errorf("unknown tool call: %s", name)
+		return nil, nil, fmt.Errorf("unknown tool call: %s", name)
 	}
 	msgType := name[5:] // strip "a2ui_" prefix
 
 	// Parse the arguments JSON
 	var args map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-		return nil, fmt.Errorf("parse tool call args: %w", err)
+		return nil, nil, fmt.Errorf("parse tool call args: %w", err)
 	}
 
 	// Inject the "type" field
@@ -137,12 +138,16 @@ func toolCallToMessage(tc anyllm.ToolCall) (*protocol.Message, error) {
 	// Re-serialize to a complete JSONL line
 	line, err := json.Marshal(args)
 	if err != nil {
-		return nil, fmt.Errorf("serialize tool call: %w", err)
+		return nil, nil, fmt.Errorf("serialize tool call: %w", err)
 	}
 
 	// Parse through the standard protocol parser
 	parser := protocol.NewParser(strings.NewReader(string(line)))
-	return parser.Next()
+	msg, err := parser.Next()
+	if err != nil {
+		return nil, nil, err
+	}
+	return msg, line, nil
 }
 
 // systemPrompt returns the system message that teaches the LLM about A2UI.
