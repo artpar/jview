@@ -226,7 +226,4 @@ Reliability, performance, packaging.
 |------|-----|----------|
 | CGo memory cleanup | infra | high |
 | Error recovery / graceful degradation | infra | high |
-| Multi-surface window management | infra | medium |
-| Incremental tree diff | infra | medium |
-| CLI flags + stdin transport | transport | medium |
 | macOS .app bundle packaging | infra | low |
