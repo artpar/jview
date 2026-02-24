@@ -11,8 +11,11 @@ static NSLayoutAttribute alignmentForAlign(NSString *align, bool horizontal) {
     if ([align isEqualToString:@"end"]) {
         return horizontal ? NSLayoutAttributeBottom : NSLayoutAttributeTrailing;
     }
-    // center (default), stretch handled separately
-    return horizontal ? NSLayoutAttributeCenterY : NSLayoutAttributeCenterX;
+    if ([align isEqualToString:@"center"]) {
+        return horizontal ? NSLayoutAttributeCenterY : NSLayoutAttributeCenterX;
+    }
+    // Default: stretch (handled in applyAlignment)
+    return 0;
 }
 
 static void applyDistribution(NSStackView *stack, NSString *justify) {
@@ -21,14 +24,15 @@ static void applyDistribution(NSStackView *stack, NSString *justify) {
     } else if ([justify isEqualToString:@"spaceAround"]) {
         stack.distribution = NSStackViewDistributionEqualSpacing;
     } else if ([justify isEqualToString:@"center"]) {
-        stack.distribution = NSStackViewDistributionGravityAreas;
+        stack.distribution = NSStackViewDistributionEqualSpacing;
     } else {
         stack.distribution = NSStackViewDistributionFill;
     }
 }
 
 static void applyAlignment(NSStackView *stack, NSString *alignStr, bool horizontal) {
-    if ([alignStr isEqualToString:@"stretch"]) {
+    bool isStretch = [alignStr isEqualToString:@"stretch"] || [alignStr length] == 0;
+    if (isStretch) {
         // Use leading alignment and pin children in SetChildren
         stack.alignment = horizontal ? NSLayoutAttributeTop : NSLayoutAttributeLeading;
         objc_setAssociatedObject(stack, kStretchModeKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
