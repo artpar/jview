@@ -3,6 +3,7 @@ package transport
 import (
 	"encoding/json"
 	"fmt"
+	"jview/jlog"
 	"jview/protocol"
 	"os/exec"
 	"runtime"
@@ -271,6 +272,24 @@ func a2uiTools() []anyllm.Tool {
 						},
 					},
 					"required": []string{"name", "params", "components"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: anyllm.Function{
+				Name:        "a2ui_getLogs",
+				Description: "Query application logs. Use this to inspect errors, debug binding issues, and understand what happened in the app. Returns matching log entries with level, component, surface, and message.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"level":      map[string]any{"type": "string", "description": "Minimum level: debug, info, warn, error (default info)"},
+						"component":  map[string]any{"type": "string", "description": "Filter by component (session, transport, darwin, mcp, resolver, etc.)"},
+						"surface_id": map[string]any{"type": "string", "description": "Filter by surface ID"},
+						"pattern":    map[string]any{"type": "string", "description": "Regex pattern to match message text"},
+						"limit":      map[string]any{"type": "integer", "description": "Max entries (default 50, max 500)"},
+						"offset":     map[string]any{"type": "integer", "description": "Skip first N matches (default 0)"},
+					},
 				},
 			},
 		},
@@ -653,4 +672,45 @@ func handleInspectLibrary(tc anyllm.ToolCall) string {
 		"count":   len(symbols),
 	})
 	return string(result)
+}
+
+// handleGetLogs queries the application log and returns matching entries as text.
+func handleGetLogs(tc anyllm.ToolCall) string {
+	var args struct {
+		Level     string `json:"level"`
+		Component string `json:"component"`
+		SurfaceID string `json:"surface_id"`
+		Pattern   string `json:"pattern"`
+		Limit     int    `json:"limit"`
+		Offset    int    `json:"offset"`
+	}
+	if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+		return fmt.Sprintf("error: invalid arguments: %v", err)
+	}
+
+	minLevel := jlog.LevelInfo
+	if args.Level != "" {
+		minLevel = jlog.ParseLevel(args.Level)
+	}
+
+	result := jlog.Query(jlog.QueryOpts{
+		MinLevel:  minLevel,
+		Component: args.Component,
+		Surface:   args.SurfaceID,
+		Pattern:   args.Pattern,
+		Limit:     args.Limit,
+		Offset:    args.Offset,
+	})
+
+	// Format as text for the LLM
+	var b strings.Builder
+	fmt.Fprintf(&b, "Log entries: %d of %d total\n\n", len(result.Entries), result.Total)
+	for _, e := range result.Entries {
+		if e.Surface != "" {
+			fmt.Fprintf(&b, "%s %s [%s/%s] %s\n", e.Time.Format("15:04:05.000"), e.LevelStr, e.Component, e.Surface, e.Message)
+		} else {
+			fmt.Fprintf(&b, "%s %s [%s] %s\n", e.Time.Format("15:04:05.000"), e.LevelStr, e.Component, e.Message)
+		}
+	}
+	return b.String()
 }

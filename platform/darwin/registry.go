@@ -1,6 +1,10 @@
 package darwin
 
-import "sync"
+import (
+	"jview/jlog"
+	"runtime"
+	"sync"
+)
 
 // CallbackRegistry maps uint64 IDs to Go callback functions.
 // Used by ObjC target-action to route events back to Go.
@@ -31,6 +35,13 @@ func (r *CallbackRegistry) Invoke(id uint64, data string) {
 	fn, ok := r.entries[id]
 	r.mu.RUnlock()
 	if ok {
+		defer func() {
+			if rec := recover(); rec != nil {
+				buf := make([]byte, 4096)
+				n := runtime.Stack(buf, false)
+				jlog.Errorf("darwin", "", "callback/%d panic recovered: %v\n%s", id, rec, buf[:n])
+			}
+		}()
 		fn(data)
 	}
 }

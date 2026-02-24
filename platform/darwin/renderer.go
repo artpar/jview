@@ -9,9 +9,9 @@ package darwin
 */
 import "C"
 import (
+	"jview/jlog"
 	"jview/protocol"
 	"jview/renderer"
-	"log"
 	"sync"
 	"unsafe"
 )
@@ -59,6 +59,14 @@ func (r *DarwinRenderer) DestroyWindow(surfaceID string) {
 	C.JVDestroyWindow(cSID)
 
 	r.mu.Lock()
+	// Unregister all callbacks from globalRegistry before removing tracking
+	if comps, ok := r.callbacks[surfaceID]; ok {
+		for _, events := range comps {
+			for _, cbID := range events {
+				globalRegistry.Unregister(uint64(cbID))
+			}
+		}
+	}
 	delete(r.handles, surfaceID)
 	delete(r.callbacks, surfaceID)
 	r.mu.Unlock()
@@ -105,7 +113,7 @@ func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode)
 	case protocol.CompAudioPlayer:
 		handle = createAudioView(node, surfaceID)
 	default:
-		log.Printf("darwin: unsupported component type %s", node.Type)
+		jlog.Warnf("darwin", surfaceID, "unsupported component type %s", node.Type)
 		return 0
 	}
 
@@ -161,7 +169,7 @@ func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle
 	case protocol.CompAudioPlayer:
 		updateAudioView(handle, node)
 	default:
-		log.Printf("darwin: unsupported update for component type %s", node.Type)
+		jlog.Warnf("darwin", surfaceID, "unsupported update for component type %s", node.Type)
 	}
 
 	applyStyle(handle, node.Style)
@@ -182,7 +190,7 @@ func (r *DarwinRenderer) SetChildren(surfaceID string, parentHandle renderer.Vie
 	case protocol.CompModal:
 		setModalChildren(parentHandle, childHandles)
 	default:
-		log.Printf("darwin: SetChildren not supported for type %s", parentType)
+		jlog.Warnf("darwin", surfaceID, "SetChildren not supported for type %s", parentType)
 	}
 }
 

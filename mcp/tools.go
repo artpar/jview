@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"jview/jlog"
 	"time"
 )
 
@@ -22,6 +23,7 @@ func (s *Server) registerTools() {
 	s.registerSetDataModel()
 	s.registerWaitFor()
 	s.registerSendMessage()
+	s.registerGetLogs()
 }
 
 // --- Query tools ---
@@ -533,6 +535,56 @@ func (s *Server) registerSendMessage() {
 			return errorResult("parse error: " + err.Error())
 		}
 		return &ToolCallResult{Content: []ContentBlock{TextContent("message sent")}}
+	})
+}
+
+// --- Log query tool ---
+
+func (s *Server) registerGetLogs() {
+	s.register("get_logs", "Query application logs with filtering and pagination", json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"level": {"type": "string", "description": "Minimum level filter: debug, info, warn, error (default info)"},
+			"component": {"type": "string", "description": "Filter by component name (e.g. session, transport, darwin, mcp)"},
+			"surface_id": {"type": "string", "description": "Filter by surface ID"},
+			"pattern": {"type": "string", "description": "Regex pattern to match against message text"},
+			"limit": {"type": "integer", "description": "Max entries to return (default 50, max 500)"},
+			"offset": {"type": "integer", "description": "Skip first N matching entries (default 0)"}
+		},
+		"additionalProperties": false
+	}`), func(args json.RawMessage) *ToolCallResult {
+		var p struct {
+			Level     string `json:"level"`
+			Component string `json:"component"`
+			SurfaceID string `json:"surface_id"`
+			Pattern   string `json:"pattern"`
+			Limit     int    `json:"limit"`
+			Offset    int    `json:"offset"`
+		}
+		if err := json.Unmarshal(args, &p); err != nil {
+			return errorResult("invalid params: " + err.Error())
+		}
+
+		minLevel := jlog.LevelInfo
+		if p.Level != "" {
+			minLevel = jlog.ParseLevel(p.Level)
+		}
+
+		opts := jlog.QueryOpts{
+			MinLevel:  minLevel,
+			Component: p.Component,
+			Surface:   p.SurfaceID,
+			Pattern:   p.Pattern,
+			Limit:     p.Limit,
+			Offset:    p.Offset,
+		}
+
+		result := jlog.Query(opts)
+		cb, err := JSONContent(result)
+		if err != nil {
+			return errorResult(err.Error())
+		}
+		return &ToolCallResult{Content: []ContentBlock{cb}}
 	})
 }
 

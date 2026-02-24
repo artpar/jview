@@ -3,12 +3,15 @@ package transport
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
+	"jview/jlog"
 	"jview/protocol"
-	"log"
+	"net"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	anyllm "github.com/mozilla-ai/any-llm-go"
 )
@@ -94,7 +97,7 @@ func (t *LLMTransport) recordLine(line []byte) {
 	if t.recorder == nil {
 		f, err := os.Create(t.config.RecordTo)
 		if err != nil {
-			log.Printf("llm: failed to open recorder: %v", err)
+			jlog.Errorf("transport", "", "failed to open recorder: %v", err)
 			return
 		}
 		t.recorder = f
@@ -119,7 +122,7 @@ func (t *LLMTransport) run() {
 	t.cancel = cancel
 	defer cancel()
 
-	log.Printf("llm: starting conversation with provider, model=%s mode=%s", t.config.Model, t.config.Mode)
+	jlog.Infof("transport", "", "starting conversation with provider, model=%s mode=%s", t.config.Model, t.config.Mode)
 
 	history := []anyllm.Message{
 		{Role: anyllm.RoleSystem, Content: systemPrompt(t.config.Prompt)},
@@ -178,16 +181,32 @@ func (t *LLMTransport) doTurnTools(ctx context.Context, history []anyllm.Message
 		default:
 		}
 
-		log.Printf("llm: sending completion request (%d messages in history)", len(history))
+		jlog.Infof("transport", "", "sending completion request (%d messages in history)", len(history))
 		maxTok := 16384
-		resp, err := t.config.Provider.Completion(ctx, anyllm.CompletionParams{
+		params := anyllm.CompletionParams{
 			Model:     t.config.Model,
 			Messages:  history,
 			Tools:     a2uiTools(),
 			MaxTokens: &maxTok,
-		})
+		}
+
+		var resp *anyllm.ChatCompletion
+		var err error
+		for attempt := 0; attempt < 3; attempt++ {
+			resp, err = t.config.Provider.Completion(ctx, params)
+			if err == nil || !isTransient(err) {
+				break
+			}
+			delay := time.Duration(1<<uint(attempt)) * time.Second
+			jlog.Warnf("transport", "", "transient error (attempt %d/3), retrying in %v: %v", attempt+1, delay, err)
+			select {
+			case <-time.After(delay):
+			case <-t.done:
+				return nil
+			}
+		}
 		if err != nil {
-			log.Printf("llm: completion error: %v", err)
+			jlog.Errorf("transport", "", "completion error: %v", err)
 			select {
 			case t.errors <- fmt.Errorf("llm completion: %w", err):
 			case <-t.done:
@@ -196,12 +215,12 @@ func (t *LLMTransport) doTurnTools(ctx context.Context, history []anyllm.Message
 		}
 
 		if len(resp.Choices) == 0 {
-			log.Printf("llm: empty response (no choices)")
+			jlog.Warn("transport", "", "empty response (no choices)")
 			return history
 		}
 
 		choice := resp.Choices[0]
-		log.Printf("llm: got response, finish_reason=%s, tool_calls=%d", choice.FinishReason, len(choice.Message.ToolCalls))
+		jlog.Infof("transport", "", "got response, finish_reason=%s, tool_calls=%d", choice.FinishReason, len(choice.Message.ToolCalls))
 
 		// Append assistant message to history
 		history = append(history, choice.Message)
@@ -209,7 +228,7 @@ func (t *LLMTransport) doTurnTools(ctx context.Context, history []anyllm.Message
 		// Process tool calls
 		if len(choice.Message.ToolCalls) > 0 {
 			for _, tc := range choice.Message.ToolCalls {
-				log.Printf("llm: processing tool call: %s", tc.Function.Name)
+				jlog.Infof("transport", "", "processing tool call: %s", tc.Function.Name)
 
 				// Handle utility tools that return data to the LLM (not protocol messages)
 				if tc.Function.Name == "a2ui_inspectLibrary" {
@@ -221,10 +240,19 @@ func (t *LLMTransport) doTurnTools(ctx context.Context, history []anyllm.Message
 					})
 					continue
 				}
+				if tc.Function.Name == "a2ui_getLogs" {
+					result := handleGetLogs(tc)
+					history = append(history, anyllm.Message{
+						Role:       anyllm.RoleTool,
+						Content:    result,
+						ToolCallID: tc.ID,
+					})
+					continue
+				}
 
 				msg, rawBytes, err := toolCallToMessage(tc)
 				if err != nil {
-					log.Printf("llm: tool call parse error: %v", err)
+					jlog.Warnf("transport", "", "tool call parse error: %v", err)
 					// Send error as tool result so the LLM knows
 					history = append(history, anyllm.Message{
 						Role:       anyllm.RoleTool,
@@ -309,7 +337,7 @@ func (t *LLMTransport) doTurnRaw(ctx context.Context, history []anyllm.Message) 
 			msg, err := parser.Next()
 			if err != nil {
 				// Non-fatal — LLM may output non-JSONL text
-				log.Printf("llm: raw parse skip: %v", err)
+				jlog.Debugf("transport", "", "raw parse skip: %v", err)
 				continue
 			}
 			t.recordLine([]byte(line))
@@ -350,4 +378,37 @@ func (t *LLMTransport) formatAction(ap actionPayload) string {
 		parts = append(parts, fmt.Sprintf("  data:\n  %s", string(data)))
 	}
 	return strings.Join(parts, "\n")
+}
+
+// isTransient returns true for errors that are likely to succeed on retry:
+// rate limits, server errors, timeouts, and connection failures.
+func isTransient(err error) bool {
+	if err == nil {
+		return false
+	}
+	// anyllm typed errors
+	var rateLimitErr *anyllm.RateLimitError
+	var providerErr *anyllm.ProviderError
+	if stderrors.As(err, &rateLimitErr) {
+		return true
+	}
+	if stderrors.As(err, &providerErr) {
+		return true
+	}
+	// Network errors: connection refused, reset, timeout
+	var netErr *net.OpError
+	if stderrors.As(err, &netErr) {
+		return true
+	}
+	if stderrors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	// String heuristics for wrapped errors
+	msg := err.Error()
+	for _, substr := range []string{"429", "500", "502", "503", "504", "timeout", "connection refused", "connection reset"} {
+		if strings.Contains(msg, substr) {
+			return true
+		}
+	}
+	return false
 }

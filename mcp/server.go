@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"jview/engine"
+	"jview/jlog"
 	"jview/protocol"
 	"jview/renderer"
-	"log"
 )
 
 // Server is an MCP server that wraps a jview Session and Renderer.
@@ -114,7 +114,7 @@ func (s *Server) handleToolsCall(req *Request) *Response {
 func (s *Server) resultResponse(v any) *Response {
 	data, err := json.Marshal(v)
 	if err != nil {
-		log.Printf("mcp: marshal error: %v", err)
+		jlog.Errorf("mcp", "", "marshal error: %v", err)
 		return &Response{
 			Error: &ResponseError{
 				Code:    InternalError,

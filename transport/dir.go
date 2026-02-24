@@ -2,8 +2,8 @@ package transport
 
 import (
 	"io"
+	"jview/jlog"
 	"jview/protocol"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -59,7 +59,7 @@ func (d *DirTransport) read() {
 			return
 		}
 	}
-	log.Println("transport: directory complete")
+	jlog.Info("transport", "", "directory complete")
 }
 
 func (d *DirTransport) readFile(path string) error {
@@ -96,7 +96,8 @@ func (d *DirTransport) readFile(path string) error {
 			return nil
 		}
 		if err != nil {
-			return err
+			jlog.Warnf("transport", "", "skipping bad line in %s: %v", path, err)
+			continue
 		}
 
 		// Handle include messages

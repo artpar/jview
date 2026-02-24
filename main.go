@@ -5,12 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"jview/engine"
+	"jview/jlog"
 	"jview/mcp"
 	"jview/platform/darwin"
 	"jview/protocol"
 	"jview/renderer"
 	"jview/transport"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,6 +29,14 @@ import (
 func main() {
 	// macOS requires the main thread for AppKit
 	runtime.LockOSThread()
+
+	// Initialize central logger
+	jlog.Init(jlog.Config{
+		MaxEntries: 10000,
+		MinLevel:   jlog.LevelInfo,
+		LogDir:     "~/.jview/logs",
+	})
+	defer jlog.Close()
 
 	// Handle "jview test <file>" — uses real AppKit for e2e testing
 	if len(os.Args) >= 3 && os.Args[1] == "test" {
@@ -79,10 +87,10 @@ func main() {
 		if *promptFile != "" && !*regenerate && transport.CacheValid(*promptFile) {
 			jsonlPath, _, _ := transport.CachePaths(*promptFile)
 			if *generateOnly {
-				log.Printf("cache hit: %s (up to date)", jsonlPath)
+				jlog.Infof("main", "", "cache hit: %s (up to date)", jsonlPath)
 				os.Exit(0)
 			}
-			log.Printf("cache hit: using %s", jsonlPath)
+			jlog.Infof("main", "", "cache hit: using %s", jsonlPath)
 			tr = transport.NewFileTransport(jsonlPath)
 		} else {
 			// LLM mode (cache miss or no prompt-file)
@@ -116,12 +124,12 @@ func main() {
 				lt.OnInitialTurnDone = func() {
 					lt.CloseRecorder()
 					if err := os.Rename(tmpPath, jsonlPath); err != nil {
-						log.Printf("cache: rename failed: %v", err)
+						jlog.Errorf("main", "", "cache: rename failed: %v", err)
 					} else {
-						log.Printf("cache: wrote %s", jsonlPath)
+						jlog.Infof("main", "", "cache: wrote %s", jsonlPath)
 					}
 					if err := transport.WriteHashFile(*promptFile); err != nil {
-						log.Printf("cache: write hash failed: %v", err)
+						jlog.Errorf("main", "", "cache: write hash failed: %v", err)
 					}
 					if generateDone != nil {
 						close(generateDone)
@@ -178,7 +186,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
-		log.Printf("ffi: loaded %d libraries from %s", len(cfg.Libraries), *ffiConfigPath)
+		jlog.Infof("main", "", "ffi: loaded %d libraries from %s", len(cfg.Libraries), *ffiConfigPath)
 	}
 
 	// Interactive mode: initialize platform and engine
@@ -193,7 +201,7 @@ func main() {
 	// Log MCP availability
 	mcpServer := mcp.NewServer(sess, rend, disp)
 	toolNames := mcpServer.ToolNames()
-	log.Printf("mcp: available via 'jview mcp [file.jsonl]' (%d tools: %s)", len(toolNames), strings.Join(toolNames, ", "))
+	jlog.Infof("main", "", "mcp: available via 'jview mcp [file.jsonl]' (%d tools: %s)", len(toolNames), strings.Join(toolNames, ", "))
 
 	// Wire action events — all transports implement SendAction
 	sess.OnAction = func(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {
@@ -208,7 +216,7 @@ func main() {
 			select {
 			case msg, ok := <-tr.Messages():
 				if !ok {
-					log.Println("main: transport closed")
+					jlog.Info("main", "", "transport closed")
 					return
 				}
 				sess.HandleMessage(msg)
@@ -217,7 +225,7 @@ func main() {
 				if !ok {
 					return
 				}
-				log.Printf("main: transport error: %v", err)
+				jlog.Errorf("main", "", "transport error: %v", err)
 			}
 		}
 	}()
@@ -305,7 +313,7 @@ func runMCP(args []string) {
 				select {
 				case msg, ok := <-tr.Messages():
 					if !ok {
-						log.Println("mcp: file transport closed")
+						jlog.Info("main", "", "mcp: file transport closed")
 						return
 					}
 					sess.HandleMessage(msg)
@@ -313,7 +321,7 @@ func runMCP(args []string) {
 					if !ok {
 						return
 					}
-					log.Printf("mcp: file transport error: %v", err)
+					jlog.Errorf("main", "", "mcp: file transport error: %v", err)
 				}
 			}
 		}()
@@ -322,13 +330,13 @@ func runMCP(args []string) {
 	mcpTransport := mcp.NewStdioTransport(os.Stdin, os.Stdout)
 	mcpServer := mcp.NewServer(sess, rend, disp)
 	toolNames := mcpServer.ToolNames()
-	log.Printf("mcp: server started on stdin/stdout (%d tools: %s)", len(toolNames), strings.Join(toolNames, ", "))
+	jlog.Infof("main", "", "mcp: server started on stdin/stdout (%d tools: %s)", len(toolNames), strings.Join(toolNames, ", "))
 
 	// Run MCP server in goroutine; on EOF, quit the app
 	go func() {
 		ctx := context.Background()
 		if err := mcpServer.Run(ctx, mcpTransport); err != nil {
-			log.Printf("mcp: server error: %v", err)
+			jlog.Errorf("main", "", "mcp: server error: %v", err)
 		}
 		darwin.AppStop()
 	}()

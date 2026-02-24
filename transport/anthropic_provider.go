@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"jview/jlog"
 	"os"
 	"strings"
 
@@ -310,7 +310,7 @@ func (p *AnthropicProvider) convertResponse(resp *anthropic.Message) *providers.
 		TotalTokens:      int(resp.Usage.InputTokens + resp.Usage.OutputTokens),
 	}
 
-	log.Printf("anthropic usage: input=%d output=%d cache_create=%d cache_read=%d",
+	jlog.Infof("transport", "", "anthropic usage: input=%d output=%d cache_create=%d cache_read=%d",
 		resp.Usage.InputTokens, resp.Usage.OutputTokens,
 		resp.Usage.CacheCreationInputTokens, resp.Usage.CacheReadInputTokens)
 

@@ -3,8 +3,8 @@ package transport
 import (
 	"fmt"
 	"io"
+	"jview/jlog"
 	"jview/protocol"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -59,7 +59,7 @@ func (f *FileTransport) read() {
 	if err := f.readFile(absPath, nil); err != nil && err != io.EOF {
 		f.errors <- err
 	}
-	log.Println("transport: file complete")
+	jlog.Info("transport", "", "file complete")
 }
 
 // readFile reads a JSONL file, handling include messages recursively.
@@ -99,7 +99,8 @@ func (f *FileTransport) readFile(absPath string, includeStack []string) error {
 			return nil
 		}
 		if err != nil {
-			return err
+			jlog.Warnf("transport", "", "skipping bad line in %s: %v", absPath, err)
+			continue
 		}
 
 		// Handle include messages at the transport level
