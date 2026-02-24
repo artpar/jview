@@ -1418,6 +1418,112 @@ func TestProcessManagerCreateAndStop(t *testing.T) {
 	}
 }
 
+func TestProcessStatusReRender(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	factory := func(cfg protocol.ProcessTransportConfig) (ProcessTransport, error) {
+		return &mockProcessTransport{
+			msgs: make(chan *protocol.Message, 16),
+			errs: make(chan error, 4),
+		}, nil
+	}
+	pm := NewProcessManager(sess, factory)
+	sess.SetProcessManager(pm)
+
+	// Create surface and a component that reads /processes/bg/status
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"Test","width":600,"height":400}`)
+	feedMessages(t, sess, `{"type":"updateComponents","surfaceId":"main","components":[{"componentId":"root","type":"Column","children":{"static":["status_text"]}},{"componentId":"status_text","type":"Text","props":{"content":{"functionCall":{"name":"if","args":[{"functionCall":{"name":"equals","args":[{"path":"/processes/bg/status"},"running"]}},"Running","Stopped"]}}}}]}`)
+
+	// Before process creation, status_text should show "Stopped"
+	node := mock.LastNode("main", "status_text")
+	if node == nil {
+		t.Fatal("status_text node not found")
+	}
+	if node.Props.Content != "Stopped" {
+		t.Errorf("before process create: content = %q, want Stopped", node.Props.Content)
+	}
+
+	// Now create the process — this should trigger re-render with "Running"
+	feedMessages(t, sess, `{"type":"createProcess","processId":"bg","transport":{"type":"file","path":"test.jsonl"}}`)
+
+	// Check that status_text was re-rendered with "Running"
+	node = mock.LastNode("main", "status_text")
+	if node == nil {
+		t.Fatal("status_text node not found after re-render")
+	}
+	if node.Props.Content != "Running" {
+		t.Errorf("after process create: content = %q, want Running", node.Props.Content)
+	}
+}
+
+func TestIntervalProcessIncrement(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	// Use a mock transport that simulates what IntervalTransport does:
+	// send an updateDataModel message with a functionCall value
+	mockTr := &mockProcessTransport{
+		msgs: make(chan *protocol.Message, 16),
+		errs: make(chan error, 4),
+	}
+	factory := func(cfg protocol.ProcessTransportConfig) (ProcessTransport, error) {
+		return mockTr, nil
+	}
+	pm := NewProcessManager(sess, factory)
+	sess.SetProcessManager(pm)
+
+	// Set up surface with a counter
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"Test","width":400,"height":300}`)
+	feedMessages(t, sess, `{"type":"updateDataModel","surfaceId":"main","ops":[{"op":"add","path":"/counter","value":0}]}`)
+	feedMessages(t, sess, `{"type":"updateComponents","surfaceId":"main","components":[{"componentId":"root","type":"Column","children":{"static":["counter_text"]}},{"componentId":"counter_text","type":"Text","props":{"content":{"path":"/counter"},"variant":"h1"}}]}`)
+
+	// Verify initial state
+	node := mock.LastNode("main", "counter_text")
+	if node == nil {
+		t.Fatal("counter_text not found")
+	}
+	if node.Props.Content != "0" {
+		t.Errorf("initial content = %q, want 0", node.Props.Content)
+	}
+
+	// Create the process
+	feedMessages(t, sess, `{"type":"createProcess","processId":"tick","transport":{"type":"interval","interval":1000,"message":{"type":"updateDataModel","surfaceId":"main","ops":[{"op":"replace","path":"/counter","value":{"functionCall":{"name":"add","args":[{"path":"/counter"},1]}}}]}}}`)
+
+	// Simulate the interval tick by sending the same message through the mock transport
+	tickMsg, err := protocol.ParseLine([]byte(`{"type":"updateDataModel","surfaceId":"main","ops":[{"op":"replace","path":"/counter","value":{"functionCall":{"name":"add","args":[{"path":"/counter"},1]}}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Route the message directly through session (simulating what the process run() goroutine does)
+	sess.HandleMessage(tickMsg)
+
+	// Verify counter incremented
+	surf := sess.GetSurface("main")
+	val, ok := surf.DM().Get("/counter")
+	if !ok {
+		t.Fatal("counter not in data model")
+	}
+	if v, ok := val.(float64); !ok || v != 1 {
+		t.Errorf("counter = %v, want 1", val)
+	}
+
+	// Verify the text was re-rendered
+	node = mock.LastNode("main", "counter_text")
+	if node.Props.Content != "1" {
+		t.Errorf("after tick: content = %q, want 1", node.Props.Content)
+	}
+
+	// Send another tick
+	sess.HandleMessage(tickMsg)
+	val, _ = surf.DM().Get("/counter")
+	if v, ok := val.(float64); !ok || v != 2 {
+		t.Errorf("counter after 2 ticks = %v, want 2", val)
+	}
+}
+
 func TestProcessManagerIDs(t *testing.T) {
 	mock := renderer.NewMockRenderer()
 	disp := &renderer.MockDispatcher{}

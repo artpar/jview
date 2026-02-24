@@ -174,13 +174,21 @@ func (s *Surface) CleanupAll() {
 
 // HandleUpdateDataModel applies data model operations and re-renders affected components.
 func (s *Surface) HandleUpdateDataModel(msg protocol.UpdateDataModel) {
+	evaluator := NewEvaluator(s.dm)
+	evaluator.FFI = s.ffi
+	evaluator.customFuncs = s.funcDefs
 	var allChanged []string
 	for _, op := range msg.Ops {
 		var changed []string
 		var err error
 		switch op.Op {
 		case "add", "replace":
-			changed, err = s.dm.Set(op.Path, op.Value)
+			value, resolveErr := evaluator.resolveArg(op.Value)
+			if resolveErr != nil {
+				logWarn("datamodel", s.id, fmt.Sprintf("resolve value error: %v", resolveErr))
+				continue
+			}
+			changed, err = s.dm.Set(op.Path, value)
 		case "remove":
 			changed, err = s.dm.Delete(op.Path)
 		default:

@@ -230,10 +230,17 @@ func main() {
 	})
 	sess.SetProcessManager(pm)
 
-	// Log MCP availability
+	// Start embedded MCP server on stdin/stdout
 	mcpServer := mcp.NewServer(sess, rend, disp, pm)
 	toolNames := mcpServer.ToolNames()
-	jlog.Infof("main", "", "mcp: available via 'jview mcp [file.jsonl]' (%d tools: %s)", len(toolNames), strings.Join(toolNames, ", "))
+	jlog.Infof("main", "", "mcp: listening on stdin/stdout (%d tools: %s)", len(toolNames), strings.Join(toolNames, ", "))
+	go func() {
+		mcpTransport := mcp.NewStdioTransport(os.Stdin, os.Stdout)
+		ctx := context.Background()
+		if err := mcpServer.Run(ctx, mcpTransport); err != nil {
+			jlog.Errorf("main", "", "mcp: server error: %v", err)
+		}
+	}()
 
 	// Wire action events — route to process transport if ProcessID is set, else main transport
 	sess.OnAction = func(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {

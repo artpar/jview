@@ -151,13 +151,16 @@ func (pm *ProcessManager) StopAll() {
 	}
 }
 
-// setStatus writes process status to the data model of all surfaces.
+// setStatus writes process status to the data model of all surfaces and triggers re-render.
 func (pm *ProcessManager) setStatus(processID, status string) {
 	path := fmt.Sprintf("/processes/%s/status", processID)
 	for _, sid := range pm.sess.SurfaceIDs() {
 		surf := pm.sess.GetSurface(sid)
 		if surf != nil {
-			surf.dm.Set(path, status)
+			surf.HandleUpdateDataModel(protocol.UpdateDataModel{
+				SurfaceID: sid,
+				Ops: []protocol.DataModelOp{{Op: "add", Path: path, Value: status}},
+			})
 		}
 	}
 }
