@@ -164,6 +164,11 @@ func (r *Resolver) Resolve(comp *protocol.Component) *renderer.RenderNode {
 		p.Loop = r.resolveBool(comp.ComponentID, cp.Loop)
 		p.Controls = r.resolveBoolDefault(comp.ComponentID, cp.Controls, true)
 		p.Muted = r.resolveBool(comp.ComponentID, cp.Muted)
+
+	case protocol.CompAudioPlayer:
+		p.Src = r.resolveString(comp.ComponentID, cp.Src)
+		p.Autoplay = r.resolveBool(comp.ComponentID, cp.Autoplay)
+		p.Loop = r.resolveBool(comp.ComponentID, cp.Loop)
 	}
 
 	node.Style = comp.Style

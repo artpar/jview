@@ -213,7 +213,7 @@ Live agent connectivity and remaining A2UI components.
 | Embedded MCP server | infra | high | **done** |
 | Modal | component | high | **done** |
 | Video (AVPlayerView) | component | medium | **done** |
-| AudioPlayer | component | low | not started |
+| AudioPlayer | component | low | **done** |
 | Theme → NSAppearance | infra | low | not started |
 | Scroll view for overflow | infra | medium | not started |
 

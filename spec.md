@@ -155,7 +155,7 @@ Defines an inline test case with assertions and event simulations. Test messages
 | `slide` | Slider | Set slider value |
 | `select` | ChoicePicker | Select option |
 | `datechange` | DateTimeInput | Set date value |
-| `ended` | Video | Fire onEnded callback |
+| `ended` | Video, AudioPlayer | Fire onEnded callback |
 
 #### Test Runner Behavior
 
@@ -593,6 +593,19 @@ Video playback using AVKit's AVPlayerView.
 
 The Video component is a leaf node (no children). URL change detection avoids reloading the same video. Autoplay only applies on initial load, not on updates. Loop mode seeks to the beginning and plays again on end. The `onEnded` callback fires only when loop is false.
 
+### AudioPlayer
+
+Audio playback using AVFoundation's AVPlayer with a compact control bar (play/pause button, progress scrubber, time display).
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| src | DynamicString | `""` | Audio URL |
+| autoplay | DynamicBoolean | `false` | Start playing on load |
+| loop | DynamicBoolean | `false` | Loop playback when audio ends |
+| onEnded | EventAction | | Action to fire when playback reaches end (non-loop mode only) |
+
+The AudioPlayer is a leaf node (no children). It renders as a horizontal bar ~40pt tall that stretches to parent width. Controls are always shown (play/pause, scrubber, time label). URL change detection avoids reloading the same audio. Autoplay only applies on initial load, not on updates. The `onEnded` callback fires only when loop is false.
+
 ---
 
 ## Visual Styling
@@ -816,8 +829,4 @@ The MCP server enables programmatic UI control, testing, and integration with ex
 
 ## Reserved Component Types (Not Yet Implemented)
 
-| Type | Phase | Description |
-|------|-------|-------------|
-| AudioPlayer | 3 | Audio playback controls |
-
-Props for this type are parsed but not rendered. The protocol type and JSON struct are already defined.
+No reserved component types remain. All Phase 3 components are implemented.

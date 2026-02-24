@@ -549,6 +549,23 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 			s.trackCallback(comp.ComponentID, "ended", cbID)
 		}
 
+	case protocol.CompAudioPlayer:
+		if comp.Props.OnEnded != nil && comp.Props.OnEnded.Action != nil {
+			action := comp.Props.OnEnded.Action
+			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "ended", func(data string) {
+				if action.Event != nil {
+					resolved := s.resolveDataRefs(action.Event)
+					if s.ActionHandler != nil {
+						s.ActionHandler(s.id, action.Event, resolved)
+					}
+				} else if action.FunctionCall != nil {
+					s.executeFunctionCall(action.FunctionCall)
+				}
+			})
+			node.Callbacks["ended"] = cbID
+			s.trackCallback(comp.ComponentID, "ended", cbID)
+		}
+
 	case protocol.CompModal:
 		binding := comp.Props.DataBinding
 		compID := comp.ComponentID

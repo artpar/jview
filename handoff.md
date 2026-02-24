@@ -43,6 +43,7 @@ A native macOS app that renders A2UI JSONL protocol as real AppKit widgets. Go e
 - forEach clone ID namespacing: IDs prefixed by parent List ID to avoid collisions across multiple lists
 - Modal component: NSPanel floating dialog with data-bound visible state, onDismiss callback, and children layout
 - Video component: AVPlayerView with src (data-bound), autoplay, loop, controls, muted, onEnded callback, URL change detection
+- AudioPlayer component: AVPlayer with compact control bar (play/pause, scrubber, time label), src, autoplay, loop, onEnded callback
 
 **300+ tests pass** across protocol/, engine/, transport/ with race detection. 28 fixtures screenshot-verified.
 
@@ -75,7 +76,7 @@ engine/                        Session routing, surface management, data model, 
   datamodel.go                 JSON Pointer get/set/delete with proper array shrinking
   binding.go                   BindingTracker: path -> component reverse index
   resolver.go                  Resolves DynamicValues against DataModel, registers bindings
-                               Handles all 17 component types + function call evaluation
+                               Handles all 18 component types + function call evaluation
   evaluator.go                 FunctionCall evaluator: 14 built-in + user-defined + FFI fallthrough, recursive arg resolution
   validator.go                 Validation engine: 5 rule types with custom messages
   ffilib.go                    Generic FFI via libffi: dlopen, ffi_prep_cif, ffi_call, handle table
@@ -270,10 +271,9 @@ sample_apps/                   LLM-generated sample applications (7 apps)
 
 ## What To Work On Next
 
-See `plan.md` for the full roadmap. LLM transport, FFI, DX abstractions, Modal, and Video are done. The immediate next priorities are:
+See `plan.md` for the full roadmap. LLM transport, FFI, DX abstractions, Modal, Video, and AudioPlayer are done. The immediate next priorities are:
 
-1. **AudioPlayer** — audio playback controls
-2. **Scroll view** — overflow handling for long content
+1. **Scroll view** — overflow handling for long content
 3. **SSE transport** — EventSource-style HTTP streaming for non-LLM agents
 4. **WebSocket transport** — bidirectional messaging
 5. **Theme → NSAppearance** — dark/light mode switching
