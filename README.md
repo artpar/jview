@@ -36,6 +36,9 @@ build/jview testdata/hello.jsonl
 # Run all tests
 make test
 
+# Run native e2e tests (real AppKit rendering)
+build/jview test testdata/contact_form_test.jsonl
+
 # Full gate (tests + screenshot verification)
 make check
 ```
@@ -60,7 +63,7 @@ Native Cocoa widgets           <- visible on screen
 
 ### LLM Transport
 
-In LLM mode, jview connects to any supported provider via [any-llm-go](https://github.com/mozilla-ai/any-llm-go) and gives the LLM 5 A2UI tools (`createSurface`, `updateComponents`, `updateDataModel`, `deleteSurface`, `setTheme`). The LLM calls these tools to build the UI. When the user clicks a button with `dataRefs`, the referenced data model values are resolved and sent back to the LLM as a new conversation turn.
+In LLM mode, jview connects to any supported provider via [any-llm-go](https://github.com/mozilla-ai/any-llm-go) and gives the LLM 6 A2UI tools (`createSurface`, `updateComponents`, `updateDataModel`, `deleteSurface`, `setTheme`, `test`). The LLM calls these tools to build the UI and define inline tests. When the user clicks a button with `dataRefs`, the referenced data model values are resolved and sent back to the LLM as a new conversation turn.
 
 Supported providers: Anthropic, OpenAI, Gemini, Ollama, DeepSeek, Groq, Mistral.
 
@@ -130,10 +133,11 @@ testdata/          JSONL fixtures for testing and demos
 
 ## Testing
 
-Three layers:
+Four layers:
 
 - **Unit tests** — pure Go, no display needed: protocol parsing, data model, bindings, resolver
 - **Integration tests** — engine with mock renderer: component creation, data binding, callbacks
+- **Native e2e tests** — real AppKit rendering with assertions on computed layout, style, data model, and actions
 - **Screenshot verification** — builds real binary, launches fixtures, captures screenshots
 
 All tests run with `-race` detection enabled.
@@ -142,7 +146,12 @@ All tests run with `-race` detection enabled.
 make test          # Headless unit + integration tests
 make verify        # Build + screenshot capture for all fixtures
 make check         # Both (the gate)
+
+# Native e2e tests (real AppKit, no display needed)
+build/jview test testdata/contact_form_test.jsonl
 ```
+
+Native e2e tests use `test` messages interleaved in JSONL files. They run with real `darwin.Renderer` and query actual NSView frames, fonts, and colors. See [spec.md](spec.md#test) for the full test message format.
 
 ## License
 

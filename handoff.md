@@ -16,16 +16,19 @@ A native macOS app that renders A2UI JSONL protocol as real AppKit widgets. Go e
 - Template expansion for dynamic child lists
 - 7 new native component bridges: Divider, Icon, Image, Slider, ChoicePicker, DateTimeInput, List
 
-**Phase 3 in progress.** LLM transport done:
+**Phase 3 in progress.** LLM transport and native testing done:
 - Bidirectional LLM transport via [any-llm-go](https://github.com/mozilla-ai/any-llm-go) v0.8.0
 - 7 providers: Anthropic, OpenAI, Gemini, Ollama, DeepSeek, Groq, Mistral
 - Default: Anthropic claude-haiku-4-5-20251001 (fast, cheap, good at tool calling)
 - Two modes: "tools" (preferred, structured tool calls) and "raw" (JSONL in text stream)
-- 5 A2UI tools map 1:1 to protocol message types, parsed through standard protocol.NewParser
+- 6 A2UI tools map 1:1 to protocol message types, parsed through standard protocol.NewParser
 - Action response: button `dataRefs` resolved from DataModel, sent back to LLM as user message → new turn
 - Conversation loop runs for the lifetime of the process — each user action triggers a new LLM turn
+- Native e2e testing framework: `jview test <file.jsonl>` runs inline test messages with real AppKit rendering
+- 8 assertion types (component, dataModel, children, notExists, count, action, layout, style) + event simulation
+- ObjC view queries for layout (NSView frame) and style (font, color, opacity)
 
-**100+ tests pass** across protocol/, engine/, transport/ with race detection. 12 fixtures screenshot-verified.
+**108+ tests pass** across protocol/, engine/, transport/ with race detection. 12 fixtures screenshot-verified.
 
 ## Repository Layout
 
@@ -58,6 +61,8 @@ engine/                        Session routing, surface management, data model, 
   evaluator_test.go            23 evaluator tests (all functions, nesting, paths, errors)
   validator_test.go            9 validator tests (all rules, custom messages, clearing)
   integration_test.go          Integration tests including slider, choicepicker, validation, templates
+  testrunner.go                Native e2e test runner (real AppKit assertions, 8 assert types)
+  testrunner_test.go           16 test runner tests (pass/fail/simulate/action/layout/style)
   e2e_test.go                  E2E tests: hello, contact_form, function_calls, list, layout
   *_test.go                    Unit tests for datamodel, binding, tree, resolver
   testhelper_test.go           goroutineLeakCheck, assertCreated, assertUpdated, newTestSession
@@ -66,12 +71,13 @@ renderer/                      Platform-agnostic interface
   renderer.go                  Renderer interface (CreateView, UpdateView, SetChildren, etc.)
   dispatch.go                  Dispatcher interface (RunOnMain)
   types.go                     ViewHandle, CallbackID, RenderNode, ResolvedProps, WindowSpec
-                               OptionItem struct, ValidationErrors, date/choice/slider fields
+                               OptionItem struct, ValidationErrors, LayoutInfo, StyleInfo
   mock.go                      MockRenderer + MockDispatcher for headless testing
 
 platform/darwin/               macOS CGo + ObjC implementation
-  app.go/.h/.m                 NSApplication init and run loop
-  renderer.go                  DarwinRenderer implementing Renderer interface (17 component types)
+  app.go/.h/.m                 NSApplication init/run loop + AppStop/AppRunUntilIdle/ForceLayout
+  viewquery.go/.h/.m           ObjC view frame/style queries (JVGetViewFrame, JVGetViewStyle)
+  renderer.go                  DarwinRenderer implementing Renderer interface (17 component types + InvokeCallback + QueryLayout/Style)
   dispatch.go/.h/.m            GCD-based main thread dispatcher
   registry.go                  CallbackRegistry (uint64 -> Go func)
   callback.go                  CGo callback bridge (GoCallbackInvoke)
@@ -93,13 +99,13 @@ transport/                     Message sources
   transport.go                 Transport interface (Messages, Errors, Start, Stop, SendAction)
   file.go                      FileTransport (reads JSONL from file, SendAction is no-op)
   llm.go                       LLMTransport (bidirectional LLM conversation loop)
-  llm_tools.go                 5 A2UI tool definitions + toolCallToMessage converter + system prompt
+  llm_tools.go                 6 A2UI tool definitions + toolCallToMessage converter + system prompt
   file_test.go                 5 channel lifecycle tests
   llm_test.go                  Mock provider tests: tool call parsing, transport lifecycle, action turns
   contract_test.go             RunTransportContractTests (reusable suite, includes SendActionDoesNotPanic)
   testhelper_test.go           goroutineLeakCheck, drain helpers
 
-testdata/                      JSONL fixtures (12 total)
+testdata/                      JSONL fixtures (13 total)
   hello.jsonl                  Card with heading + body text
   contact_form.jsonl           Form with data binding, preview card, checkbox, submit
   layout.jsonl                 Nested Row/Column with Cards and Button
@@ -112,6 +118,7 @@ testdata/                      JSONL fixtures (12 total)
   datetimeinput.jsonl          Date picker with binding
   validation.jsonl             Form with required + minLength + email rules
   list.jsonl                   List with forEach template over 3 items
+  contact_form_test.jsonl      Native e2e test: contact form with 6 test cases
 ```
 
 ## Key Patterns
@@ -148,7 +155,9 @@ testdata/                      JSONL fixtures (12 total)
 - `make test` — headless, race-detected, no display needed
 - `make verify` — builds binary, launches fixtures, captures screenshots
 - `make check` — both (the gate, run before any commit)
+- `build/jview test <file.jsonl>` — native e2e tests with real AppKit rendering
 - MockRenderer + MockDispatcher enable full engine testing without AppKit
+- Native test runner uses real DarwinRenderer + synchronous MockDispatcher (avoids dispatch_async deadlock)
 - `goroutineLeakCheck(t)` — call at test start, defer the result
 
 ## Gotchas
@@ -183,6 +192,7 @@ make build                           # Build binary to build/jview
 make test                            # Headless tests with -race
 make verify                          # Screenshot verification (12 fixtures)
 make check                           # Full gate (test + verify)
+build/jview test testdata/contact_form_test.jsonl  # Native e2e test
 build/jview testdata/hello.jsonl     # File mode (static fixture)
 build/jview --prompt "Build a todo app"  # LLM mode (default: anthropic/haiku)
 build/jview --prompt-file prompt.txt    # LLM mode with prompt from file

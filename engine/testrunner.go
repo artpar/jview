@@ -213,6 +213,10 @@ func assertChildren(sess *Session, surfaceID string, step protocol.TestStep) str
 		return fmt.Sprintf("surface %q not found", surfaceID)
 	}
 
+	if _, exists := surf.tree.Get(step.ComponentID); !exists {
+		return fmt.Sprintf("assertChildren: component %q not found", step.ComponentID)
+	}
+
 	children := surf.tree.Children(step.ComponentID)
 	if len(children) != len(step.Children) {
 		return fmt.Sprintf("assertChildren %s: got %v, want %v", step.ComponentID, children, step.Children)
@@ -245,6 +249,10 @@ func assertCount(sess *Session, surfaceID string, step protocol.TestStep) string
 		return fmt.Sprintf("surface %q not found", surfaceID)
 	}
 
+	if _, exists := surf.tree.Get(step.ComponentID); !exists {
+		return fmt.Sprintf("assertCount: component %q not found", step.ComponentID)
+	}
+
 	children := surf.tree.Children(step.ComponentID)
 	if len(children) != step.Count {
 		return fmt.Sprintf("assertCount %s: len(children) = %d, want %d", step.ComponentID, len(children), step.Count)
@@ -262,11 +270,11 @@ func assertAction(actions *[]CapturedAction, step protocol.TestStep) string {
 		if len(step.ActionData) == 0 {
 			return ""
 		}
-		// Subset match on data
+		// Match on data: every expected key must be present and equal
 		for key, expected := range step.ActionData {
 			got, exists := a.Data[key]
 			if !exists {
-				continue
+				return fmt.Sprintf("assertAction %s: data[%s] not present", step.ActionName, key)
 			}
 			if !jsonEqual(got, expected) {
 				return fmt.Sprintf("assertAction %s: data[%s] = %v, want %v", step.ActionName, key, got, expected)
@@ -320,7 +328,7 @@ func assertStyle(rend renderer.Renderer, surfaceID string, step protocol.TestSte
 		return fmt.Sprintf("assertStyle: unmarshal error: %v", err)
 	}
 
-	for key, expected := range step.Layout {
+	for key, expected := range step.Style {
 		got, exists := actual[key]
 		if !exists {
 			if isZeroValue(expected) {

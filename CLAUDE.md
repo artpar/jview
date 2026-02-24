@@ -16,7 +16,7 @@ This is the single command that validates everything. Run it before any commit. 
 
 If stage 1 fails, stage 2 doesn't run. Both must pass.
 
-### Three Layers of Testing
+### Four Layers of Testing
 
 #### Layer 1: Unit Tests (headless, fast, CI-safe)
 ```
@@ -64,7 +64,31 @@ Builds the real binary, launches each `testdata/*.jsonl` fixture, waits 2 second
 make verify-fixture F=testdata/hello.jsonl
 ```
 
-#### Layer 3: Interactive Testing (manual, for binding/callback work)
+#### Layer 3: Native E2E Tests (real AppKit, automated)
+```
+build/jview test testdata/contact_form_test.jsonl
+```
+Runs with real `darwin.Renderer` on the main thread using synchronous `MockDispatcher` (avoids dispatch_async deadlock). Test messages (`"type":"test"`) are interleaved in the same JSONL files. Queries real NSView frames, fonts, colors.
+
+**What they cover:**
+- Component prop assertions (subset matching on resolved props)
+- Data model value assertions at JSON Pointer paths
+- Child relationship assertions (ordered child IDs, count)
+- Action assertions (server action fired with correct name/data)
+- Layout assertions (real NSView frame: x, y, width, height)
+- Style assertions (real NSView font, text color, background, opacity)
+- Event simulation (change, click, toggle, slide, select, datechange)
+
+**Assertion types:** `component`, `dataModel`, `children`, `notExists`, `count`, `action`, `layout`, `style`
+
+**When to do this:** after adding components, changing layout, or modifying the rendering pipeline.
+
+**Adding a new e2e test:**
+1. Create `testdata/<name>_test.jsonl` with app setup + `"type":"test"` messages
+2. Add a Go test in `engine/testrunner_test.go` that calls `RunTestFile` with the fixture
+3. Run `build/jview test testdata/<name>_test.jsonl` to verify with real AppKit
+
+#### Layer 4: Interactive Testing (manual, for binding/callback work)
 ```
 build/jview testdata/contact_form.jsonl
 ```
@@ -101,8 +125,12 @@ Every component and every feature gets a fixture in `testdata/`. Fixtures are:
 | `engine/tree_test.go` | Component hierarchy, roots, children | Unit |
 | `engine/integration_test.go` | Session + Surface with mock renderer | Integration |
 | `engine/e2e_test.go` | Full pipeline: file → transport → engine → mock | E2E |
+| `engine/testrunner.go` | Native e2e test runner (real AppKit assertions) | Test infra |
+| `engine/testrunner_test.go` | Test runner unit tests (16 tests) | Unit |
 | `renderer/mock.go` | MockRenderer + MockDispatcher | Test infra |
+| `platform/darwin/viewquery.go/.h/.m` | ObjC view frame/style queries | Test infra |
 | `testdata/*.jsonl` | Fixture files used by E2E + screenshots | Data |
+| `testdata/*_test.jsonl` | Native e2e test fixtures with inline assertions | E2E |
 
 ## Architecture
 
@@ -179,6 +207,7 @@ Live agent connectivity and remaining A2UI components.
 |------|-----|----------|--------|
 | LLM transport (any-llm-go) | transport | critical | **done** |
 | Action response pipeline | transport | high | **done** |
+| Native e2e test framework | testing | high | **done** |
 | SSE transport | transport | medium | not started |
 | WebSocket transport | transport | medium | not started |
 | Tabs | component | high | not started |

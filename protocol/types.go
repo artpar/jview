@@ -54,6 +54,9 @@ type TestStep struct {
 	// assert=layout: check computed layout properties
 	Layout map[string]interface{} `json:"layout,omitempty"`
 
+	// assert=style: check computed style properties
+	Style map[string]interface{} `json:"style,omitempty"`
+
 	// simulate=event
 	Event     string `json:"event,omitempty"`
 	EventData string `json:"eventData,omitempty"`

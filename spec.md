@@ -97,6 +97,69 @@ Paths use JSON Pointer syntax (RFC 6901): `/foo/bar/0` addresses `root.foo.bar[0
 
 After all ops execute, the engine finds components bound to affected paths and re-renders them.
 
+### test
+
+Defines an inline test case with assertions and event simulations. Test messages are interleaved with app messages in the same JSONL file. `jview <file.jsonl>` ignores test messages. `jview test <file.jsonl>` executes them against real AppKit rendering.
+
+```json
+{
+  "type": "test",
+  "surfaceId": "main",
+  "name": "initial state",
+  "steps": [
+    {"assert": "component", "componentId": "heading", "props": {"content": "Welcome", "variant": "h1"}},
+    {"assert": "dataModel", "path": "/name", "value": ""},
+    {"assert": "children", "componentId": "root", "children": ["heading", "body"]},
+    {"assert": "count", "componentId": "root", "count": 2},
+    {"assert": "notExists", "componentId": "ghost"},
+    {"assert": "layout", "componentId": "heading", "layout": {"width": 200}},
+    {"assert": "style", "componentId": "heading", "style": {"fontSize": 24, "bold": true}}
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| surfaceId | string | yes | Surface to test against |
+| name | string | yes | Human-readable test case name |
+| steps | TestStep[] | yes | Sequence of assertions and simulations |
+
+#### Assertion Types
+
+| Assert | Fields | Description |
+|--------|--------|-------------|
+| `component` | componentId, props, componentType | Subset match on resolved props. Optionally check component type. |
+| `dataModel` | path, value | Check data model value at JSON Pointer path |
+| `children` | componentId, children | Check ordered list of child component IDs |
+| `count` | componentId, count | Check number of children |
+| `notExists` | componentId | Verify component does not exist |
+| `action` | name, data | Check that a server action was fired with matching name and data |
+| `layout` | componentId, layout | Check computed layout (x, y, width, height) from real NSView frames |
+| `style` | componentId, style | Check computed style (fontName, fontSize, bold, italic, textColor, bgColor, hidden, opacity) from real NSView properties |
+
+#### Event Simulation
+
+```json
+{"simulate": "event", "componentId": "nameField", "event": "change", "eventData": "Alice"}
+```
+
+| Event | Component | Description |
+|-------|-----------|-------------|
+| `change` | TextField | Set text value |
+| `click` | Button | Trigger onClick action |
+| `toggle` | CheckBox | Toggle checked state |
+| `slide` | Slider | Set slider value |
+| `select` | ChoicePicker | Select option |
+| `datechange` | DateTimeInput | Set date value |
+
+#### Test Runner Behavior
+
+- Tests execute sequentially in file order
+- Side effects from simulations persist across tests (shared session state)
+- Captured actions reset at the start of each test
+- `jview test` uses real AppKit rendering (not mocked) with synchronous dispatch
+- Exit code 0 if all pass, 1 if any fail
+
 ### setTheme
 
 Changes the visual theme. *Not yet implemented — reserved for Phase 3.*

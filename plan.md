@@ -39,6 +39,7 @@ Live agent connectivity and remaining A2UI components.
 |------|----------|--------|-------------|
 | LLM transport | critical | **done** | Bidirectional LLM transport via any-llm-go. Tool calling + raw JSONL modes. 7 providers (Anthropic, OpenAI, Gemini, Ollama, DeepSeek, Groq, Mistral). Default: Anthropic claude-haiku-4-5-20251001. |
 | Action response pipeline | high | **done** | Button `dataRefs` resolved from DataModel, forwarded via `Transport.SendAction()`. LLM transport formats as user message → new turn. |
+| Native e2e test framework | high | **done** | `jview test <file.jsonl>` runs inline test messages with real AppKit. 8 assertion types + event simulation. ObjC view queries for layout/style. LLM tool `a2ui_test` for LLM-generated tests. |
 | SSE transport | medium | not started | `EventSource`-style HTTP streaming. Must pass `RunTransportContractTests`. |
 | WebSocket transport | medium | not started | Bidirectional messaging. Must pass `RunTransportContractTests`. |
 | stdin transport | low | not started | Read JSONL from stdin pipe. Useful for `agent | jview`. Must pass `RunTransportContractTests`. |
@@ -104,3 +105,5 @@ Each phase follows the same pattern:
 | Tool calling over raw JSONL | Tool calls give structured arguments → reliable parsing. Raw mode as fallback for models without tool support. |
 | Non-streaming tool mode | Use `Completion()` not `CompletionStream()` for tool mode. Tool calls arrive atomically in non-streaming responses, avoiding partial argument assembly. |
 | Default to Anthropic Haiku | Fast, cheap, good at tool calling. Sensible default for interactive UI generation. |
+| Real AppKit for e2e tests | Tests query actual NSView frames, fonts, colors — not mock values. Synchronous MockDispatcher + real DarwinRenderer avoids dispatch_async deadlock on main thread. |
+| Test messages inline in JSONL | Tests colocated with app definition. `jview` ignores them, `jview test` executes them. Single source of truth for app + tests. |

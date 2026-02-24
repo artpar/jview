@@ -128,7 +128,7 @@ func a2uiTools() []anyllm.Tool {
 								"type": "object",
 								"properties": map[string]any{
 									"assert":        map[string]any{"type": "string", "enum": []string{"component", "dataModel", "children", "notExists", "count", "action", "layout", "style"}},
-									"simulate":      map[string]any{"type": "string", "enum": []string{"event", "setLayout"}},
+									"simulate":      map[string]any{"type": "string", "enum": []string{"event"}},
 									"componentId":   map[string]any{"type": "string"},
 									"componentType": map[string]any{"type": "string"},
 									"props":         map[string]any{"type": "object"},
@@ -139,6 +139,7 @@ func a2uiTools() []anyllm.Tool {
 									"name":          map[string]any{"type": "string"},
 									"data":          map[string]any{"type": "object"},
 									"layout":        map[string]any{"type": "object"},
+								"style":         map[string]any{"type": "object"},
 									"event":         map[string]any{"type": "string"},
 									"eventData":     map[string]any{"type": "string"},
 								},
@@ -231,7 +232,7 @@ Assertion types:
 - count: Check child count. {"assert":"count","componentId":"parent","count":3}
 - action: Check that an action was fired. {"assert":"action","name":"submitForm","data":{"/name":"Alice"}}
 - layout: Check computed layout (x, y, width, height). {"assert":"layout","componentId":"id","layout":{"width":200,"height":50}}
-- style: Check computed style (fontName, fontSize, bold, italic, textColor, bgColor, hidden, opacity). {"assert":"style","componentId":"id","layout":{"fontSize":13,"bold":true}}
+- style: Check computed style (fontName, fontSize, bold, italic, textColor, bgColor, hidden, opacity). {"assert":"style","componentId":"id","style":{"fontSize":13,"bold":true}}
 
 Simulation:
 - event: Trigger user interaction. {"simulate":"event","componentId":"field","event":"change","eventData":"Alice"}
