@@ -198,18 +198,64 @@ func main() {
 		sess.SetFFI(ffiRegistry)
 	}
 
+	// Set up process manager with transport factory
+	pm := engine.NewProcessManager(sess, func(cfg protocol.ProcessTransportConfig) (engine.ProcessTransport, error) {
+		switch cfg.Type {
+		case "file":
+			ft := transport.NewFileTransport(cfg.Path)
+			return ft, nil
+		case "interval":
+			if cfg.Interval <= 0 {
+				return nil, fmt.Errorf("interval transport requires interval > 0")
+			}
+			if cfg.Message == nil {
+				return nil, fmt.Errorf("interval transport requires message")
+			}
+			return transport.NewIntervalTransport(cfg.Interval, cfg.Message), nil
+		case "llm":
+			provider, err := createProvider(cfg.Provider, "")
+			if err != nil {
+				return nil, fmt.Errorf("create LLM provider: %w", err)
+			}
+			llmCfg := transport.LLMConfig{
+				Provider: provider,
+				Model:    cfg.Model,
+				Prompt:   cfg.Prompt,
+				Mode:     "tools",
+			}
+			return transport.NewLLMTransport(llmCfg), nil
+		default:
+			return nil, fmt.Errorf("unknown process transport type: %q", cfg.Type)
+		}
+	})
+	sess.SetProcessManager(pm)
+
 	// Log MCP availability
-	mcpServer := mcp.NewServer(sess, rend, disp)
+	mcpServer := mcp.NewServer(sess, rend, disp, pm)
 	toolNames := mcpServer.ToolNames()
 	jlog.Infof("main", "", "mcp: available via 'jview mcp [file.jsonl]' (%d tools: %s)", len(toolNames), strings.Join(toolNames, ", "))
 
-	// Wire action events — all transports implement SendAction
+	// Wire action events — route to process transport if ProcessID is set, else main transport
 	sess.OnAction = func(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {
+		if event.ProcessID != "" && pm != nil {
+			pm.SendTo(event.ProcessID, &protocol.Message{
+				Type:      protocol.MsgUpdateDataModel,
+				SurfaceID: surfaceID,
+			})
+			return
+		}
 		tr.SendAction(surfaceID, event, data)
 	}
 
 	// Process messages in a goroutine
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				jlog.Errorf("main", "", "panic in transport goroutine: %v", r)
+				fmt.Fprintf(os.Stderr, "[PANIC RECOVERED] transport goroutine: %v\n", r)
+			}
+		}()
+
 		tr.Start()
 
 		for {
@@ -308,6 +354,12 @@ func runMCP(args []string) {
 	if len(args) > 0 {
 		tr := createFileTransport(args[0])
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					jlog.Errorf("main", "", "panic in mcp file transport: %v", r)
+				}
+			}()
+
 			tr.Start()
 			for {
 				select {

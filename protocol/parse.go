@@ -133,6 +133,27 @@ func ParseLine(line []byte) (*Message, error) {
 		}
 		msg.Body = inc
 
+	case MsgCreateProcess:
+		var cp CreateProcess
+		if err := json.Unmarshal(env.Payload, &cp); err != nil {
+			return nil, fmt.Errorf("parse createProcess: %w", err)
+		}
+		msg.Body = cp
+
+	case MsgStopProcess:
+		var sp StopProcess
+		if err := json.Unmarshal(env.Payload, &sp); err != nil {
+			return nil, fmt.Errorf("parse stopProcess: %w", err)
+		}
+		msg.Body = sp
+
+	case MsgSendToProcess:
+		var stp SendToProcess
+		if err := json.Unmarshal(env.Payload, &stp); err != nil {
+			return nil, fmt.Errorf("parse sendToProcess: %w", err)
+		}
+		msg.Body = stp
+
 	default:
 		return nil, fmt.Errorf("unknown message type: %s", env.Type)
 	}

@@ -145,8 +145,9 @@ func (s *Surface) cleanupComponents(removedIDs []string) {
 	})
 }
 
-// CleanupAll unregisters all callbacks and bindings for every component in the tree.
-// Called before surface deletion to prevent stale callback invocations.
+// CleanupAll unregisters all callbacks and bindings for every component in the tree,
+// and dispatches RemoveView for each component with a handle.
+// Called before surface deletion to prevent stale callback invocations and resource leaks.
 func (s *Surface) CleanupAll() {
 	allIDs := s.tree.All()
 	for _, id := range allIDs {
@@ -159,6 +160,16 @@ func (s *Surface) CleanupAll() {
 		s.tracker.Unregister(id)
 		delete(s.validationErrors, id)
 	}
+
+	// Dispatch RemoveView on main thread for components that have handles
+	s.dispatch.RunOnMain(func() {
+		for _, id := range allIDs {
+			handle := s.rend.GetHandle(s.id, id)
+			if handle != 0 {
+				s.rend.RemoveView(s.id, id, handle)
+			}
+		}
+	})
 }
 
 // HandleUpdateDataModel applies data model operations and re-renders affected components.
@@ -243,15 +254,18 @@ func (s *Surface) renderComponents(componentIDs []string) {
 	s.dispatch.RunOnMain(func() {
 		// First pass: create/update all views (leaves first)
 		for _, w := range ordered {
-			handle := s.rend.GetHandle(s.id, w.node.ComponentID)
-			if handle == 0 {
-				h := s.rend.CreateView(s.id, w.node)
-				if h == 0 {
-					logWarn("render", s.id, fmt.Sprintf("CreateView returned 0 for %s (type %s)", w.node.ComponentID, w.node.Type))
+			func() {
+				defer logRecover("render", s.id, "CreateView/UpdateView "+w.node.ComponentID)
+				handle := s.rend.GetHandle(s.id, w.node.ComponentID)
+				if handle == 0 {
+					h := s.rend.CreateView(s.id, w.node)
+					if h == 0 {
+						logWarn("render", s.id, fmt.Sprintf("CreateView returned 0 for %s (type %s)", w.node.ComponentID, w.node.Type))
+					}
+				} else {
+					s.rend.UpdateView(s.id, handle, w.node)
 				}
-			} else {
-				s.rend.UpdateView(s.id, handle, w.node)
-			}
+			}()
 		}
 
 		// Second pass: set children for containers (now all children exist)
@@ -259,20 +273,23 @@ func (s *Surface) renderComponents(componentIDs []string) {
 			if len(w.node.ChildIDs) == 0 {
 				continue
 			}
-			parentHandle := s.rend.GetHandle(s.id, w.node.ComponentID)
-			if parentHandle == 0 {
-				continue
-			}
-			childHandles := make([]renderer.ViewHandle, 0, len(w.node.ChildIDs))
-			for _, childID := range w.node.ChildIDs {
-				ch := s.rend.GetHandle(s.id, childID)
-				if ch != 0 {
-					childHandles = append(childHandles, ch)
+			func() {
+				defer logRecover("render", s.id, "SetChildren "+w.node.ComponentID)
+				parentHandle := s.rend.GetHandle(s.id, w.node.ComponentID)
+				if parentHandle == 0 {
+					return
 				}
-			}
-			if len(childHandles) > 0 {
-				s.rend.SetChildren(s.id, parentHandle, childHandles)
-			}
+				childHandles := make([]renderer.ViewHandle, 0, len(w.node.ChildIDs))
+				for _, childID := range w.node.ChildIDs {
+					ch := s.rend.GetHandle(s.id, childID)
+					if ch != 0 {
+						childHandles = append(childHandles, ch)
+					}
+				}
+				if len(childHandles) > 0 {
+					s.rend.SetChildren(s.id, parentHandle, childHandles)
+				}
+			}()
 		}
 
 		// Set root view(s)
@@ -325,6 +342,8 @@ func (s *Surface) resolveDataRefs(event *protocol.EventDef) map[string]interface
 
 // executeFunctionCall handles client-side function calls from button actions.
 func (s *Surface) executeFunctionCall(fc *protocol.ActionFuncCall) {
+	defer logRecover("functioncall", s.id, fc.Call)
+
 	switch fc.Call {
 	case "updateDataModel":
 		s.executeUpdateDataModel(fc.Args)

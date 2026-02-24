@@ -134,3 +134,12 @@ void JVModalSetChildren(void* handle, void** children, int count) {
         [contentStack addArrangedSubview:child];
     }
 }
+
+void JVCleanupModal(void* handle) {
+    NSView *proxy = (__bridge NSView*)handle;
+    NSPanel *panel = objc_getAssociatedObject(proxy, kModalPanelKey);
+    if (panel) {
+        panel.delegate = nil;
+        [panel orderOut:nil];
+    }
+}

@@ -262,3 +262,13 @@ void JVUpdateAudio(void* handle, const char* src, bool loop) {
         loadAudio(container, srcStr, NO);
     }
 }
+
+void JVCleanupAudio(void* handle) {
+    NSView *container = (__bridge NSView*)handle;
+    removeTimeObserver(container);
+    removeEndedObserver(container);
+    AVPlayer *player = objc_getAssociatedObject(container, kAudioPlayerKey);
+    if (player) {
+        [player pause];
+    }
+}

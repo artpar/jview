@@ -17,6 +17,9 @@ const (
 	MsgDefineFunction   MessageType = "defineFunction"
 	MsgDefineComponent  MessageType = "defineComponent"
 	MsgInclude          MessageType = "include"
+	MsgCreateProcess    MessageType = "createProcess"
+	MsgStopProcess      MessageType = "stopProcess"
+	MsgSendToProcess    MessageType = "sendToProcess"
 )
 
 // TestMessage defines a test case with a sequence of assert/simulate steps.

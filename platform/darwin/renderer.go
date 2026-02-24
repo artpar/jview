@@ -195,6 +195,12 @@ func (r *DarwinRenderer) SetChildren(surfaceID string, parentHandle renderer.Vie
 }
 
 func (r *DarwinRenderer) RemoveView(surfaceID string, componentID string, handle renderer.ViewHandle) {
+	// Type-specific cleanup (observer removal, player pause, etc.) before removing from superview
+	r.mu.Lock()
+	compType := r.types[handle]
+	r.mu.Unlock()
+	cleanupView(handle, compType)
+
 	removeView(handle)
 
 	r.mu.Lock()

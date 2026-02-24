@@ -13,9 +13,10 @@ type Action struct {
 
 // EventDef is a server-bound event with optional data references.
 type EventDef struct {
-	Name     string                 `json:"name"`
-	Context  map[string]interface{} `json:"context,omitempty"`
-	DataRefs []string               `json:"dataRefs,omitempty"`
+	Name      string                 `json:"name"`
+	Context   map[string]interface{} `json:"context,omitempty"`
+	DataRefs  []string               `json:"dataRefs,omitempty"`
+	ProcessID string                 `json:"processId,omitempty"`
 }
 
 // ActionFuncCall is a client-side function call (e.g., updateDataModel).

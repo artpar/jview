@@ -480,3 +480,112 @@ func TestParseUseComponent(t *testing.T) {
 		t.Errorf("args.label = %v, want '7'", comp.Args["label"])
 	}
 }
+
+func TestParseCreateProcess(t *testing.T) {
+	input := `{"type":"createProcess","processId":"bg","transport":{"type":"file","path":"bg.jsonl"}}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Type != MsgCreateProcess {
+		t.Fatalf("expected createProcess, got %s", msg.Type)
+	}
+	cp := msg.Body.(CreateProcess)
+	if cp.ProcessID != "bg" {
+		t.Errorf("processId = %q, want bg", cp.ProcessID)
+	}
+	if cp.Transport.Type != "file" {
+		t.Errorf("transport.type = %q, want file", cp.Transport.Type)
+	}
+	if cp.Transport.Path != "bg.jsonl" {
+		t.Errorf("transport.path = %q, want bg.jsonl", cp.Transport.Path)
+	}
+}
+
+func TestParseCreateProcessInterval(t *testing.T) {
+	input := `{"type":"createProcess","processId":"tick","transport":{"type":"interval","interval":1000,"message":{"type":"updateDataModel","surfaceId":"main","ops":[{"op":"replace","path":"/tick","value":true}]}}}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp := msg.Body.(CreateProcess)
+	if cp.ProcessID != "tick" {
+		t.Errorf("processId = %q, want tick", cp.ProcessID)
+	}
+	if cp.Transport.Type != "interval" {
+		t.Errorf("transport.type = %q, want interval", cp.Transport.Type)
+	}
+	if cp.Transport.Interval != 1000 {
+		t.Errorf("transport.interval = %d, want 1000", cp.Transport.Interval)
+	}
+	if cp.Transport.Message == nil {
+		t.Fatal("transport.message is nil")
+	}
+}
+
+func TestParseCreateProcessLLM(t *testing.T) {
+	input := `{"type":"createProcess","processId":"agent","transport":{"type":"llm","provider":"anthropic","model":"claude-sonnet-4-5-20250929","prompt":"You are a helper"}}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp := msg.Body.(CreateProcess)
+	if cp.ProcessID != "agent" {
+		t.Errorf("processId = %q, want agent", cp.ProcessID)
+	}
+	if cp.Transport.Type != "llm" {
+		t.Errorf("transport.type = %q, want llm", cp.Transport.Type)
+	}
+	if cp.Transport.Provider != "anthropic" {
+		t.Errorf("transport.provider = %q, want anthropic", cp.Transport.Provider)
+	}
+	if cp.Transport.Model != "claude-sonnet-4-5-20250929" {
+		t.Errorf("transport.model = %q, want claude-sonnet-4-5-20250929", cp.Transport.Model)
+	}
+	if cp.Transport.Prompt != "You are a helper" {
+		t.Errorf("transport.prompt = %q, want 'You are a helper'", cp.Transport.Prompt)
+	}
+}
+
+func TestParseStopProcess(t *testing.T) {
+	input := `{"type":"stopProcess","processId":"bg"}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Type != MsgStopProcess {
+		t.Fatalf("expected stopProcess, got %s", msg.Type)
+	}
+	sp := msg.Body.(StopProcess)
+	if sp.ProcessID != "bg" {
+		t.Errorf("processId = %q, want bg", sp.ProcessID)
+	}
+}
+
+func TestParseSendToProcess(t *testing.T) {
+	input := `{"type":"sendToProcess","processId":"agent","message":{"type":"updateDataModel","surfaceId":"main","ops":[{"op":"add","path":"/input","value":"hello"}]}}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Type != MsgSendToProcess {
+		t.Fatalf("expected sendToProcess, got %s", msg.Type)
+	}
+	stp := msg.Body.(SendToProcess)
+	if stp.ProcessID != "agent" {
+		t.Errorf("processId = %q, want agent", stp.ProcessID)
+	}
+	if stp.Message == nil {
+		t.Fatal("message is nil")
+	}
+}

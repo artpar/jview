@@ -14,6 +14,7 @@ type Server struct {
 	sess  *engine.Session
 	rend  renderer.Renderer
 	disp  renderer.Dispatcher
+	pm    *engine.ProcessManager
 	tools map[string]toolHandler
 }
 
@@ -22,13 +23,16 @@ type toolHandler struct {
 	handler func(json.RawMessage) *ToolCallResult
 }
 
-// NewServer creates a new MCP server.
-func NewServer(sess *engine.Session, rend renderer.Renderer, disp renderer.Dispatcher) *Server {
+// NewServer creates a new MCP server. pm may be nil if process management is not available.
+func NewServer(sess *engine.Session, rend renderer.Renderer, disp renderer.Dispatcher, pm ...*engine.ProcessManager) *Server {
 	s := &Server{
 		sess:  sess,
 		rend:  rend,
 		disp:  disp,
 		tools: make(map[string]toolHandler),
+	}
+	if len(pm) > 0 {
+		s.pm = pm[0]
 	}
 	s.registerTools()
 	return s

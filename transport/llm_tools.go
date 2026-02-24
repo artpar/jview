@@ -278,6 +278,48 @@ func a2uiTools() []anyllm.Tool {
 		{
 			Type: "function",
 			Function: anyllm.Function{
+				Name:        "a2ui_createProcess",
+				Description: "Start a managed background process with its own transport. Processes can read JSONL files, connect to LLMs, or send messages on a timer. Process status is written to /processes/{processId}/status in the data model of all surfaces.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"processId": map[string]any{"type": "string", "description": "Unique process identifier"},
+						"transport": map[string]any{
+							"type":        "object",
+							"description": "Transport configuration",
+							"properties": map[string]any{
+								"type":     map[string]any{"type": "string", "enum": []string{"file", "llm", "interval"}, "description": "Transport type"},
+								"path":     map[string]any{"type": "string", "description": "File transport: JSONL file path"},
+								"provider": map[string]any{"type": "string", "description": "LLM transport: provider name"},
+								"model":    map[string]any{"type": "string", "description": "LLM transport: model name"},
+								"prompt":   map[string]any{"type": "string", "description": "LLM transport: system prompt"},
+								"interval": map[string]any{"type": "integer", "description": "Interval transport: milliseconds between messages"},
+								"message":  map[string]any{"description": "Interval transport: A2UI JSONL message to send on each tick"},
+							},
+							"required": []string{"type"},
+						},
+					},
+					"required": []string{"processId", "transport"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: anyllm.Function{
+				Name:        "a2ui_stopProcess",
+				Description: "Stop a running background process.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"processId": map[string]any{"type": "string", "description": "Process ID to stop"},
+					},
+					"required": []string{"processId"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: anyllm.Function{
 				Name:        "a2ui_getLogs",
 				Description: "Query application logs. Use this to inspect errors, debug binding issues, and understand what happened in the app. Returns matching log entries with level, component, surface, and message.",
 				Parameters: map[string]any{

@@ -136,3 +136,11 @@ void JVUpdateVideo(void* handle, const char* src, int width, int height, bool lo
         loadVideo(playerView, srcStr, NO);
     }
 }
+
+void JVCleanupVideo(void* handle) {
+    AVPlayerView *playerView = (__bridge AVPlayerView*)handle;
+    removeEndedObserver(playerView);
+    if (playerView.player) {
+        [playerView.player pause];
+    }
+}

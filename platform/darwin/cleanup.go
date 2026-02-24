@@ -1,0 +1,30 @@
+package darwin
+
+/*
+#cgo CFLAGS: -x objective-c -fobjc-arc
+#cgo LDFLAGS: -framework Cocoa -framework AVFoundation -framework AVKit
+
+#include "audio.h"
+#include "video.h"
+#include "modal.h"
+*/
+import "C"
+import (
+	"jview/protocol"
+	"jview/renderer"
+	"unsafe"
+)
+
+// cleanupView performs type-specific cleanup before removing a view.
+// Audio/Video need observer removal and player pause; Modal needs delegate nil and panel close.
+// Other types are handled by ARC when removeFromSuperview is called.
+func cleanupView(handle renderer.ViewHandle, compType protocol.ComponentType) {
+	switch compType {
+	case protocol.CompAudioPlayer:
+		C.JVCleanupAudio(unsafe.Pointer(handle))
+	case protocol.CompVideo:
+		C.JVCleanupVideo(unsafe.Pointer(handle))
+	case protocol.CompModal:
+		C.JVCleanupModal(unsafe.Pointer(handle))
+	}
+}

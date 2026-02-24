@@ -6,5 +6,6 @@
 
 void* JVCreateAudio(const char* src, bool autoplay, bool loop, uint64_t endedCbID);
 void JVUpdateAudio(void* handle, const char* src, bool loop);
+void JVCleanupAudio(void* handle);
 
 #endif

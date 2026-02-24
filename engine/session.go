@@ -15,6 +15,7 @@ type Session struct {
 	assets   *AssetRegistry
 	funcDefs map[string]*FuncDef
 	compDefs map[string]*protocol.DefineComponent
+	pm       *ProcessManager
 
 	// OnAction is called when any surface triggers a server-bound event.
 	OnAction func(surfaceID string, event *protocol.EventDef, data map[string]interface{})
@@ -35,8 +36,15 @@ func (s *Session) SetFFI(ffi *FFIRegistry) {
 	s.ffi = ffi
 }
 
+// SetProcessManager attaches a process manager to this session.
+func (s *Session) SetProcessManager(pm *ProcessManager) {
+	s.pm = pm
+}
+
 // HandleMessage routes a parsed A2UI message to the appropriate surface.
 func (s *Session) HandleMessage(msg *protocol.Message) {
+	defer logRecover("session", "", "HandleMessage")
+
 	switch msg.Type {
 	case protocol.MsgCreateSurface:
 		cs := msg.Body.(protocol.CreateSurface)
@@ -93,6 +101,41 @@ func (s *Session) HandleMessage(msg *protocol.Message) {
 	case protocol.MsgTest:
 		// Test messages are handled by the test runner, not the session.
 		return
+
+	case protocol.MsgCreateProcess:
+		cp := msg.Body.(protocol.CreateProcess)
+		if s.pm == nil {
+			logWarn("session", "", "createProcess received but no ProcessManager configured")
+			return
+		}
+		if err := s.pm.Create(cp); err != nil {
+			logError("session", "", fmt.Sprintf("createProcess error: %v", err))
+		}
+
+	case protocol.MsgStopProcess:
+		sp := msg.Body.(protocol.StopProcess)
+		if s.pm == nil {
+			logWarn("session", "", "stopProcess received but no ProcessManager configured")
+			return
+		}
+		if err := s.pm.Stop(sp.ProcessID); err != nil {
+			logError("session", "", fmt.Sprintf("stopProcess error: %v", err))
+		}
+
+	case protocol.MsgSendToProcess:
+		stp := msg.Body.(protocol.SendToProcess)
+		if s.pm == nil {
+			logWarn("session", "", "sendToProcess received but no ProcessManager configured")
+			return
+		}
+		innerMsg, err := protocol.ParseLine(stp.Message)
+		if err != nil {
+			logError("session", "", fmt.Sprintf("sendToProcess parse error: %v", err))
+			return
+		}
+		if err := s.pm.SendTo(stp.ProcessID, innerMsg); err != nil {
+			logError("session", "", fmt.Sprintf("sendToProcess error: %v", err))
+		}
 
 	default:
 		logWarn("session", "", fmt.Sprintf("unknown message type %s", msg.Type))

@@ -24,6 +24,10 @@ func (s *Server) registerTools() {
 	s.registerWaitFor()
 	s.registerSendMessage()
 	s.registerGetLogs()
+	s.registerListProcesses()
+	s.registerCreateProcess()
+	s.registerStopProcess()
+	s.registerSendToProcess()
 }
 
 // --- Query tools ---
@@ -586,6 +590,137 @@ func (s *Server) registerGetLogs() {
 		}
 		return &ToolCallResult{Content: []ContentBlock{cb}}
 	})
+}
+
+// --- Process tools ---
+
+func (s *Server) registerListProcesses() {
+	s.register("list_processes", "List all running processes", json.RawMessage(`{
+		"type": "object",
+		"properties": {},
+		"additionalProperties": false
+	}`), func(args json.RawMessage) *ToolCallResult {
+		if s.pm == nil {
+			return errorResult("process manager not available")
+		}
+		ids := s.pm.IDs()
+		type processInfo struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		}
+		result := make([]processInfo, len(ids))
+		for i, id := range ids {
+			result[i] = processInfo{ID: id, Status: s.pm.GetStatus(id)}
+		}
+		cb, err := JSONContent(result)
+		if err != nil {
+			return errorResult(err.Error())
+		}
+		return &ToolCallResult{Content: []ContentBlock{cb}}
+	})
+}
+
+func (s *Server) registerCreateProcess() {
+	s.register("create_process", "Create and start a background process with its own transport", json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"process_id": {"type": "string", "description": "Unique process identifier"},
+			"transport": {
+				"type": "object",
+				"description": "Transport configuration",
+				"properties": {
+					"type": {"type": "string", "enum": ["file", "llm", "interval"]},
+					"path": {"type": "string"},
+					"provider": {"type": "string"},
+					"model": {"type": "string"},
+					"prompt": {"type": "string"},
+					"interval": {"type": "integer"},
+					"message": {}
+				},
+				"required": ["type"]
+			}
+		},
+		"required": ["process_id", "transport"],
+		"additionalProperties": false
+	}`), func(args json.RawMessage) *ToolCallResult {
+		if s.pm == nil {
+			return errorResult("process manager not available")
+		}
+		var p struct {
+			ProcessID string          `json:"process_id"`
+			Transport json.RawMessage `json:"transport"`
+		}
+		if err := json.Unmarshal(args, &p); err != nil {
+			return errorResult("invalid params: " + err.Error())
+		}
+		// Build the createProcess message and route through session
+		msgJSON := fmt.Sprintf(`{"type":"createProcess","processId":%s,"transport":%s}`,
+			mustJSON(p.ProcessID), string(p.Transport))
+		if err := s.SendMessage(json.RawMessage(msgJSON)); err != nil {
+			return errorResult("create process error: " + err.Error())
+		}
+		return &ToolCallResult{Content: []ContentBlock{TextContent("process created: " + p.ProcessID)}}
+	})
+}
+
+func (s *Server) registerStopProcess() {
+	s.register("stop_process", "Stop a running background process", json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"process_id": {"type": "string", "description": "Process ID to stop"}
+		},
+		"required": ["process_id"],
+		"additionalProperties": false
+	}`), func(args json.RawMessage) *ToolCallResult {
+		if s.pm == nil {
+			return errorResult("process manager not available")
+		}
+		var p struct {
+			ProcessID string `json:"process_id"`
+		}
+		if err := json.Unmarshal(args, &p); err != nil {
+			return errorResult("invalid params: " + err.Error())
+		}
+		msgJSON := fmt.Sprintf(`{"type":"stopProcess","processId":%s}`, mustJSON(p.ProcessID))
+		if err := s.SendMessage(json.RawMessage(msgJSON)); err != nil {
+			return errorResult("stop process error: " + err.Error())
+		}
+		return &ToolCallResult{Content: []ContentBlock{TextContent("process stopped: " + p.ProcessID)}}
+	})
+}
+
+func (s *Server) registerSendToProcess() {
+	s.register("send_to_process", "Send an A2UI message to a running process", json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"process_id": {"type": "string", "description": "Target process ID"},
+			"message": {"description": "A2UI JSONL message object to send"}
+		},
+		"required": ["process_id", "message"],
+		"additionalProperties": false
+	}`), func(args json.RawMessage) *ToolCallResult {
+		if s.pm == nil {
+			return errorResult("process manager not available")
+		}
+		var p struct {
+			ProcessID string          `json:"process_id"`
+			Message   json.RawMessage `json:"message"`
+		}
+		if err := json.Unmarshal(args, &p); err != nil {
+			return errorResult("invalid params: " + err.Error())
+		}
+		msgJSON := fmt.Sprintf(`{"type":"sendToProcess","processId":%s,"message":%s}`,
+			mustJSON(p.ProcessID), string(p.Message))
+		if err := s.SendMessage(json.RawMessage(msgJSON)); err != nil {
+			return errorResult("send to process error: " + err.Error())
+		}
+		return &ToolCallResult{Content: []ContentBlock{TextContent("message sent to process: " + p.ProcessID)}}
+	})
+}
+
+func mustJSON(v any) string {
+	data, _ := json.Marshal(v)
+	return string(data)
 }
 
 // --- Helpers ---

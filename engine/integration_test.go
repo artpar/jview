@@ -1359,3 +1359,114 @@ func TestDeleteSurfaceCleanupCallbacks(t *testing.T) {
 		t.Error("invoking stale callback panicked")
 	}
 }
+
+func TestProcessManagerCreateAndStop(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	// Create a mock transport factory that makes a simple channel-based transport
+	factory := func(cfg protocol.ProcessTransportConfig) (ProcessTransport, error) {
+		return &mockProcessTransport{
+			msgs: make(chan *protocol.Message, 16),
+			errs: make(chan error, 4),
+		}, nil
+	}
+
+	pm := NewProcessManager(sess, factory)
+	sess.SetProcessManager(pm)
+
+	// Create a surface first
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"Test","width":600,"height":400}`)
+
+	// Create a process
+	feedMessages(t, sess, `{"type":"createProcess","processId":"bg","transport":{"type":"file","path":"test.jsonl"}}`)
+
+	// Verify process is running
+	status := pm.GetStatus("bg")
+	if status != "running" {
+		t.Errorf("process status = %q, want running", status)
+	}
+
+	// Verify process status in data model
+	surf := sess.GetSurface("main")
+	if surf == nil {
+		t.Fatal("surface not found")
+	}
+	val, ok := surf.DM().Get("/processes/bg/status")
+	if !ok {
+		t.Fatal("process status not in data model")
+	}
+	if val != "running" {
+		t.Errorf("data model process status = %v, want running", val)
+	}
+
+	// Stop the process
+	feedMessages(t, sess, `{"type":"stopProcess","processId":"bg"}`)
+
+	status = pm.GetStatus("bg")
+	if status != "stopped" {
+		t.Errorf("process status after stop = %q, want stopped", status)
+	}
+
+	val, ok = surf.DM().Get("/processes/bg/status")
+	if !ok {
+		t.Fatal("process status not in data model after stop")
+	}
+	if val != "stopped" {
+		t.Errorf("data model process status after stop = %v, want stopped", val)
+	}
+}
+
+func TestProcessManagerIDs(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	factory := func(cfg protocol.ProcessTransportConfig) (ProcessTransport, error) {
+		return &mockProcessTransport{
+			msgs: make(chan *protocol.Message, 16),
+			errs: make(chan error, 4),
+		}, nil
+	}
+
+	pm := NewProcessManager(sess, factory)
+	sess.SetProcessManager(pm)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"Test","width":600,"height":400}`)
+	feedMessages(t, sess, `{"type":"createProcess","processId":"p1","transport":{"type":"file","path":"a.jsonl"}}`)
+	feedMessages(t, sess, `{"type":"createProcess","processId":"p2","transport":{"type":"file","path":"b.jsonl"}}`)
+
+	ids := pm.IDs()
+	if len(ids) != 2 {
+		t.Errorf("process count = %d, want 2", len(ids))
+	}
+
+	pm.StopAll()
+	for _, id := range ids {
+		if pm.GetStatus(id) != "stopped" {
+			t.Errorf("process %s not stopped after StopAll", id)
+		}
+	}
+}
+
+// mockProcessTransport satisfies ProcessTransport for testing.
+type mockProcessTransport struct {
+	msgs    chan *protocol.Message
+	errs    chan error
+	started bool
+}
+
+func (m *mockProcessTransport) Messages() <-chan *protocol.Message { return m.msgs }
+func (m *mockProcessTransport) Errors() <-chan error               { return m.errs }
+func (m *mockProcessTransport) Start()                             { m.started = true }
+func (m *mockProcessTransport) Stop() {
+	select {
+	case <-m.msgs:
+	default:
+		close(m.msgs)
+		close(m.errs)
+	}
+}
+func (m *mockProcessTransport) SendAction(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {
+}

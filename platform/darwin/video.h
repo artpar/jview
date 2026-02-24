@@ -6,5 +6,6 @@
 
 void* JVCreateVideo(const char* src, int width, int height, bool autoplay, bool loop, bool controls, bool muted, uint64_t endedCbID);
 void JVUpdateVideo(void* handle, const char* src, int width, int height, bool loop, bool controls, bool muted);
+void JVCleanupVideo(void* handle);
 
 #endif
