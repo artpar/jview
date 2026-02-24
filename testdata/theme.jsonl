@@ -1,0 +1,3 @@
+{"type":"createSurface","surfaceId":"main","title":"Theme Demo","width":400,"height":300}
+{"type":"updateComponents","surfaceId":"main","components":[{"componentId":"card","type":"Card","title":"Dark Theme Card","children":["text"]},{"componentId":"text","type":"Text","parentId":"card","props":{"content":"This window uses dark theme."}}]}
+{"type":"setTheme","surfaceId":"main","theme":"dark"}

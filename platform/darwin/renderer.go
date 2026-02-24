@@ -227,6 +227,14 @@ func (r *DarwinRenderer) UnregisterCallback(id renderer.CallbackID) {
 	globalRegistry.Unregister(uint64(id))
 }
 
+func (r *DarwinRenderer) SetTheme(surfaceID string, theme string) {
+	cSID := C.CString(surfaceID)
+	defer C.free(unsafe.Pointer(cSID))
+	cTheme := C.CString(theme)
+	defer C.free(unsafe.Pointer(cTheme))
+	C.JVSetWindowTheme(cSID, cTheme)
+}
+
 func (r *DarwinRenderer) SetRootView(surfaceID string, handle renderer.ViewHandle) {
 	cSID := C.CString(surfaceID)
 	defer C.free(unsafe.Pointer(cSID))

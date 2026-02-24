@@ -275,6 +275,9 @@ func (m *MockRenderer) GetAsset(alias string) (AssetSpec, bool) {
 	return a, ok
 }
 
+// SetTheme is a no-op for the mock renderer.
+func (m *MockRenderer) SetTheme(surfaceID string, theme string) {}
+
 // CaptureWindow is a no-op for the mock renderer.
 func (m *MockRenderer) CaptureWindow(surfaceID string) ([]byte, error) {
 	return nil, nil

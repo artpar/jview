@@ -85,8 +85,10 @@ func (s *Session) HandleMessage(msg *protocol.Message) {
 		return
 
 	case protocol.MsgSetTheme:
-		// Phase 3: theme support
-		log.Printf("session: setTheme not yet implemented")
+		st := msg.Body.(protocol.SetTheme)
+		s.dispatch.RunOnMain(func() {
+			s.rend.SetTheme(st.SurfaceID, st.Theme)
+		})
 
 	case protocol.MsgTest:
 		// Test messages are handled by the test runner, not the session.

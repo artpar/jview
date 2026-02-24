@@ -171,6 +171,33 @@ void JVDestroyWindow(const char* surfaceID) {
     }
 }
 
+static void invalidateLayersRecursively(NSView *view) {
+    if (view.layer) {
+        [view.layer setNeedsDisplay];
+    }
+    view.needsDisplay = YES;
+    for (NSView *subview in view.subviews) {
+        invalidateLayersRecursively(subview);
+    }
+}
+
+void JVSetWindowTheme(const char* surfaceID, const char* theme) {
+    NSString *sid = [NSString stringWithUTF8String:surfaceID];
+    NSWindow *window = windowMap[sid];
+    if (!window) return;
+
+    NSString *themeStr = [NSString stringWithUTF8String:theme];
+    NSAppearance *appearance = nil;
+    if ([themeStr isEqualToString:@"dark"]) {
+        appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    } else if ([themeStr isEqualToString:@"light"]) {
+        appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+    }
+    window.appearance = appearance;
+    invalidateLayersRecursively(window.contentView);
+    [window invalidateShadow];
+}
+
 void JVSetWindowRootView(const char* surfaceID, void* view, int padding) {
     NSString *sid = [NSString stringWithUTF8String:surfaceID];
     NSWindow *window = windowMap[sid];

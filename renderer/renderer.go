@@ -53,6 +53,10 @@ type Renderer interface {
 	// LoadAssets registers fonts, preloads images, and caches asset metadata.
 	LoadAssets(assets []AssetSpec)
 
+	// SetTheme changes the visual theme for a surface's window.
+	// theme: "light", "dark", or "system"
+	SetTheme(surfaceID string, theme string)
+
 	// CaptureWindow captures the window content as a PNG image.
 	CaptureWindow(surfaceID string) ([]byte, error)
 }
