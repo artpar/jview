@@ -11,7 +11,7 @@ A native macOS app that renders A2UI JSONL protocol as real AppKit widgets. Go e
 **Phase 1 complete.** Core rendering: Text, Row, Column, Card, Button, TextField, CheckBox with two-way data binding and callbacks.
 
 **Phase 2 complete.** Full interactivity and all remaining form/display components:
-- FunctionCall evaluator with 14 built-in functions
+- FunctionCall evaluator with 17 built-in functions (including array: append, removeLast, slice)
 - Validation engine with 5 rule types
 - Template expansion for dynamic child lists
 - 7 new native component bridges: Divider, Icon, Image, Slider, ChoicePicker, DateTimeInput, List
@@ -49,7 +49,7 @@ A native macOS app that renders A2UI JSONL protocol as real AppKit widgets. Go e
 - MCP thread-safety: interaction tools (click/fill/toggle/interact) wrapped in dispatchSync to run on main thread with render flush
 - MCP OnAction wiring: no-op action handler prevents nil panic when buttons fire events in MCP mode
 
-**300+ tests pass** across protocol/, engine/, transport/ with race detection. 31 fixtures screenshot-verified.
+**318 tests pass** across protocol/, engine/, transport/ with race detection. 31 fixtures screenshot-verified.
 
 ## Repository Layout
 
@@ -81,13 +81,13 @@ engine/                        Session routing, surface management, data model, 
   binding.go                   BindingTracker: path -> component reverse index
   resolver.go                  Resolves DynamicValues against DataModel, registers bindings
                                Handles all 18 component types + function call evaluation
-  evaluator.go                 FunctionCall evaluator: 14 built-in + user-defined + FFI fallthrough, recursive arg resolution
+  evaluator.go                 FunctionCall evaluator: 17 built-in + user-defined + FFI fallthrough, recursive arg resolution
   validator.go                 Validation engine: 5 rule types with custom messages
   ffilib.go                    Generic FFI via libffi: dlopen, ffi_prep_cif, ffi_call, handle table
   ffilib_config.go             FFI config loading (JSON file with library/function declarations)
   ffilib_test.go               FFI unit tests (typed calls, handle table, error cases, session integration)
   ffi_e2e_test.go              FFI e2e tests with real system libraries (libcurl, libsqlite3, libz)
-  evaluator_test.go            23 evaluator tests (all functions, nesting, paths, errors)
+  evaluator_test.go            30 evaluator tests (all functions incl. array ops, nesting, paths, errors)
   validator_test.go            9 validator tests (all rules, custom messages, clearing)
   substitution_test.go         8 tests for substituteParams, rewriteComponentIDs, rewriteScopedPaths
   integration_test.go          Integration tests including slider, choicepicker, validation, templates,
@@ -96,7 +96,8 @@ engine/                        Session routing, surface management, data model, 
   testrunner_test.go           Test runner tests (all assertion types, edge cases, simulation, integration)
   e2e_test.go                  E2E tests: hello, contact_form, function_calls, list, layout, calculator,
                                custom_functions, component_defs, includes, calculator_v2, scoped_components,
-                               modal, video, audio
+                               modal, video, audio + sample app tests (theme_switcher, dynamic_list,
+                               scrollable_feed, sysinfo, calculator)
   *_test.go                    Unit tests for datamodel, binding, tree, resolver
   testhelper_test.go           goroutineLeakCheck, assertCreated, assertUpdated, newTestSession
 
@@ -192,6 +193,9 @@ testdata/                      JSONL fixtures (29 top-level + subdirectories)
   reminders.jsonl              Full Reminders app (Tabs, List, CheckBox, Button actions)
   includes/                    Include feature: main.jsonl includes defs.jsonl
   calculator_v2/               All DX features combined: include + defineFunction + defineComponent
+
+samples/                       Hand-authored JSONL sample apps
+  dynamic_list.jsonl           Dynamic list with add/remove via append/removeLast functionCalls + tests
 
 sample_apps/                   LLM-generated sample applications (9 apps)
   */prompt.txt                 Natural language app description (sent to LLM)

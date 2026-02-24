@@ -12,7 +12,7 @@ func newTestEvaluator() (*Evaluator, *DataModel) {
 
 func TestEvalConcat(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("concat", []interface{}{"hello", " ", "world"})
+	result, err := eval.Eval("concat", []any{"hello", " ", "world"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,9 +24,9 @@ func TestEvalConcat(t *testing.T) {
 func TestEvalConcatWithPath(t *testing.T) {
 	eval, dm := newTestEvaluator()
 	dm.Set("/name", "Alice")
-	result, err := eval.Eval("concat", []interface{}{
+	result, err := eval.Eval("concat", []any{
 		"Hello, ",
-		map[string]interface{}{"path": "/name"},
+		map[string]any{"path": "/name"},
 		"!",
 	})
 	if err != nil {
@@ -39,7 +39,7 @@ func TestEvalConcatWithPath(t *testing.T) {
 
 func TestEvalFormat(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("format", []interface{}{"Hello, {0}! You are {1}.", "Alice", "great"})
+	result, err := eval.Eval("format", []any{"Hello, {0}! You are {1}.", "Alice", "great"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestEvalFormat(t *testing.T) {
 
 func TestEvalToUpperCase(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("toUpperCase", []interface{}{"hello"})
+	result, err := eval.Eval("toUpperCase", []any{"hello"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestEvalToUpperCase(t *testing.T) {
 
 func TestEvalToLowerCase(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("toLowerCase", []interface{}{"HELLO"})
+	result, err := eval.Eval("toLowerCase", []any{"HELLO"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestEvalToLowerCase(t *testing.T) {
 
 func TestEvalTrim(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("trim", []interface{}{"  hello  "})
+	result, err := eval.Eval("trim", []any{"  hello  "})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestEvalTrim(t *testing.T) {
 
 func TestEvalSubstring(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("substring", []interface{}{"hello world", float64(0), float64(5)})
+	result, err := eval.Eval("substring", []any{"hello world", float64(0), float64(5)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestEvalSubstring(t *testing.T) {
 
 func TestEvalSubstringNoEnd(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("substring", []interface{}{"hello world", float64(6)})
+	result, err := eval.Eval("substring", []any{"hello world", float64(6)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestEvalSubstringNoEnd(t *testing.T) {
 
 func TestEvalLength(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("length", []interface{}{"hello"})
+	result, err := eval.Eval("length", []any{"hello"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestEvalLength(t *testing.T) {
 
 func TestEvalAdd(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("add", []interface{}{float64(2), float64(3)})
+	result, err := eval.Eval("add", []any{float64(2), float64(3)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestEvalAdd(t *testing.T) {
 
 func TestEvalSubtract(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("subtract", []interface{}{float64(10), float64(3)})
+	result, err := eval.Eval("subtract", []any{float64(10), float64(3)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestEvalSubtract(t *testing.T) {
 
 func TestEvalMultiply(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("multiply", []interface{}{float64(4), float64(5)})
+	result, err := eval.Eval("multiply", []any{float64(4), float64(5)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestEvalMultiply(t *testing.T) {
 
 func TestEvalDivide(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("divide", []interface{}{float64(10), float64(2)})
+	result, err := eval.Eval("divide", []any{float64(10), float64(2)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestEvalDivide(t *testing.T) {
 
 func TestEvalDivideByZero(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	_, err := eval.Eval("divide", []interface{}{float64(10), float64(0)})
+	_, err := eval.Eval("divide", []any{float64(10), float64(0)})
 	if err == nil {
 		t.Error("expected division by zero error")
 	}
@@ -168,7 +168,7 @@ func TestEvalDivideByZero(t *testing.T) {
 
 func TestEvalEquals(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("equals", []interface{}{"hello", "hello"})
+	result, err := eval.Eval("equals", []any{"hello", "hello"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestEvalEquals(t *testing.T) {
 		t.Errorf("equals = %v, want true", result)
 	}
 
-	result, err = eval.Eval("equals", []interface{}{"hello", "world"})
+	result, err = eval.Eval("equals", []any{"hello", "world"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestEvalEquals(t *testing.T) {
 
 func TestEvalGreaterThan(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("greaterThan", []interface{}{float64(5), float64(3)})
+	result, err := eval.Eval("greaterThan", []any{float64(5), float64(3)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestEvalGreaterThan(t *testing.T) {
 		t.Errorf("greaterThan(5,3) = %v, want true", result)
 	}
 
-	result, err = eval.Eval("greaterThan", []interface{}{float64(2), float64(3)})
+	result, err = eval.Eval("greaterThan", []any{float64(2), float64(3)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestEvalGreaterThan(t *testing.T) {
 
 func TestEvalNot(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("not", []interface{}{true})
+	result, err := eval.Eval("not", []any{true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestEvalNot(t *testing.T) {
 		t.Errorf("not(true) = %v, want false", result)
 	}
 
-	result, err = eval.Eval("not", []interface{}{false})
+	result, err = eval.Eval("not", []any{false})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,11 +226,11 @@ func TestEvalNot(t *testing.T) {
 func TestEvalNestedFunctionCall(t *testing.T) {
 	eval, _ := newTestEvaluator()
 	// concat(toUpperCase("hello"), " ", "world")
-	result, err := eval.Eval("concat", []interface{}{
-		map[string]interface{}{
-			"functionCall": map[string]interface{}{
+	result, err := eval.Eval("concat", []any{
+		map[string]any{
+			"functionCall": map[string]any{
 				"name": "toUpperCase",
-				"args": []interface{}{"hello"},
+				"args": []any{"hello"},
 			},
 		},
 		" ",
@@ -248,12 +248,12 @@ func TestEvalNestedWithPath(t *testing.T) {
 	eval, dm := newTestEvaluator()
 	dm.Set("/name", "alice")
 	// concat(toUpperCase({path: "/name"}), "!")
-	result, err := eval.Eval("concat", []interface{}{
-		map[string]interface{}{
-			"functionCall": map[string]interface{}{
+	result, err := eval.Eval("concat", []any{
+		map[string]any{
+			"functionCall": map[string]any{
 				"name": "toUpperCase",
-				"args": []interface{}{
-					map[string]interface{}{"path": "/name"},
+				"args": []any{
+					map[string]any{"path": "/name"},
 				},
 			},
 		},
@@ -269,7 +269,7 @@ func TestEvalNestedWithPath(t *testing.T) {
 
 func TestEvalUnknownFunction(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	_, err := eval.Eval("bogusFunc", []interface{}{"a"})
+	_, err := eval.Eval("bogusFunc", []any{"a"})
 	if err == nil {
 		t.Error("expected error for unknown function")
 	}
@@ -277,9 +277,9 @@ func TestEvalUnknownFunction(t *testing.T) {
 
 func TestEvalMissingPath(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("concat", []interface{}{
+	result, err := eval.Eval("concat", []any{
 		"Hello, ",
-		map[string]interface{}{"path": "/nonexistent"},
+		map[string]any{"path": "/nonexistent"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -291,14 +291,14 @@ func TestEvalMissingPath(t *testing.T) {
 }
 
 func TestPathsInArgs(t *testing.T) {
-	args := []interface{}{
+	args := []any{
 		"literal",
-		map[string]interface{}{"path": "/name"},
-		map[string]interface{}{
-			"functionCall": map[string]interface{}{
+		map[string]any{"path": "/name"},
+		map[string]any{
+			"functionCall": map[string]any{
 				"name": "toUpperCase",
-				"args": []interface{}{
-					map[string]interface{}{"path": "/title"},
+				"args": []any{
+					map[string]any{"path": "/title"},
 				},
 			},
 		},
@@ -314,14 +314,14 @@ func TestPathsInArgs(t *testing.T) {
 
 func TestEvalIf(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("if", []interface{}{true, "yes", "no"})
+	result, err := eval.Eval("if", []any{true, "yes", "no"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result != "yes" {
 		t.Errorf("if(true) = %v, want 'yes'", result)
 	}
-	result, err = eval.Eval("if", []interface{}{false, "yes", "no"})
+	result, err = eval.Eval("if", []any{false, "yes", "no"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,14 +332,14 @@ func TestEvalIf(t *testing.T) {
 
 func TestEvalOr(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("or", []interface{}{false, false, true})
+	result, err := eval.Eval("or", []any{false, false, true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result != true {
 		t.Errorf("or(false,false,true) = %v, want true", result)
 	}
-	result, err = eval.Eval("or", []interface{}{false, false})
+	result, err = eval.Eval("or", []any{false, false})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,14 +350,14 @@ func TestEvalOr(t *testing.T) {
 
 func TestEvalAnd(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("and", []interface{}{true, true, true})
+	result, err := eval.Eval("and", []any{true, true, true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result != true {
 		t.Errorf("and(true,true,true) = %v, want true", result)
 	}
-	result, err = eval.Eval("and", []interface{}{true, false})
+	result, err = eval.Eval("and", []any{true, false})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,13 +369,13 @@ func TestEvalAnd(t *testing.T) {
 func TestEvalIfLazy(t *testing.T) {
 	eval, _ := newTestEvaluator()
 	// When condition is true, falseVal is NOT evaluated (contains error-producing calc("",0,0))
-	brokenExpr := map[string]interface{}{
-		"functionCall": map[string]interface{}{
+	brokenExpr := map[string]any{
+		"functionCall": map[string]any{
 			"name": "calc",
-			"args": []interface{}{"", float64(0), float64(0)},
+			"args": []any{"", float64(0), float64(0)},
 		},
 	}
-	result, err := eval.Eval("if", []interface{}{true, "yes", brokenExpr})
+	result, err := eval.Eval("if", []any{true, "yes", brokenExpr})
 	if err != nil {
 		t.Fatalf("if(true, 'yes', broken) should not error, got: %v", err)
 	}
@@ -384,7 +384,7 @@ func TestEvalIfLazy(t *testing.T) {
 	}
 
 	// When condition is false, trueVal is NOT evaluated
-	result, err = eval.Eval("if", []interface{}{false, brokenExpr, "no"})
+	result, err = eval.Eval("if", []any{false, brokenExpr, "no"})
 	if err != nil {
 		t.Fatalf("if(false, broken, 'no') should not error, got: %v", err)
 	}
@@ -396,13 +396,13 @@ func TestEvalIfLazy(t *testing.T) {
 func TestEvalOrLazy(t *testing.T) {
 	eval, _ := newTestEvaluator()
 	// First arg is true → short-circuit, never evaluate broken second arg
-	brokenExpr := map[string]interface{}{
-		"functionCall": map[string]interface{}{
+	brokenExpr := map[string]any{
+		"functionCall": map[string]any{
 			"name": "calc",
-			"args": []interface{}{"", float64(0), float64(0)},
+			"args": []any{"", float64(0), float64(0)},
 		},
 	}
-	result, err := eval.Eval("or", []interface{}{true, brokenExpr})
+	result, err := eval.Eval("or", []any{true, brokenExpr})
 	if err != nil {
 		t.Fatalf("or(true, broken) should not error, got: %v", err)
 	}
@@ -414,13 +414,13 @@ func TestEvalOrLazy(t *testing.T) {
 func TestEvalAndLazy(t *testing.T) {
 	eval, _ := newTestEvaluator()
 	// First arg is false → short-circuit, never evaluate broken second arg
-	brokenExpr := map[string]interface{}{
-		"functionCall": map[string]interface{}{
+	brokenExpr := map[string]any{
+		"functionCall": map[string]any{
 			"name": "calc",
-			"args": []interface{}{"", float64(0), float64(0)},
+			"args": []any{"", float64(0), float64(0)},
 		},
 	}
-	result, err := eval.Eval("and", []interface{}{false, brokenExpr})
+	result, err := eval.Eval("and", []any{false, brokenExpr})
 	if err != nil {
 		t.Fatalf("and(false, broken) should not error, got: %v", err)
 	}
@@ -431,7 +431,7 @@ func TestEvalAndLazy(t *testing.T) {
 
 func TestEvalToNumber(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("toNumber", []interface{}{"42"})
+	result, err := eval.Eval("toNumber", []any{"42"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,7 +442,7 @@ func TestEvalToNumber(t *testing.T) {
 
 func TestEvalToString(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("toString", []interface{}{float64(42)})
+	result, err := eval.Eval("toString", []any{float64(42)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +464,7 @@ func TestEvalCalc(t *testing.T) {
 		{"/", 10, 2, 5},
 	}
 	for _, tc := range cases {
-		result, err := eval.Eval("calc", []interface{}{tc.op, tc.a, tc.b})
+		result, err := eval.Eval("calc", []any{tc.op, tc.a, tc.b})
 		if err != nil {
 			t.Fatalf("calc(%s, %v, %v): %v", tc.op, tc.a, tc.b, err)
 		}
@@ -476,7 +476,7 @@ func TestEvalCalc(t *testing.T) {
 
 func TestEvalCalcDivZero(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	_, err := eval.Eval("calc", []interface{}{"/", float64(1), float64(0)})
+	_, err := eval.Eval("calc", []any{"/", float64(1), float64(0)})
 	if err == nil {
 		t.Error("expected division by zero error")
 	}
@@ -484,14 +484,14 @@ func TestEvalCalcDivZero(t *testing.T) {
 
 func TestEvalContains(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("contains", []interface{}{"hello world", "world"})
+	result, err := eval.Eval("contains", []any{"hello world", "world"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result != true {
 		t.Errorf("contains('hello world','world') = %v, want true", result)
 	}
-	result, err = eval.Eval("contains", []interface{}{"hello", "xyz"})
+	result, err = eval.Eval("contains", []any{"hello", "xyz"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -502,14 +502,14 @@ func TestEvalContains(t *testing.T) {
 
 func TestEvalNegate(t *testing.T) {
 	eval, _ := newTestEvaluator()
-	result, err := eval.Eval("negate", []interface{}{float64(42)})
+	result, err := eval.Eval("negate", []any{float64(42)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result != float64(-42) {
 		t.Errorf("negate(42) = %v, want -42", result)
 	}
-	result, err = eval.Eval("negate", []interface{}{float64(-5)})
+	result, err = eval.Eval("negate", []any{float64(-5)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -521,8 +521,8 @@ func TestEvalNegate(t *testing.T) {
 func TestEvalAddWithPath(t *testing.T) {
 	eval, dm := newTestEvaluator()
 	dm.Set("/x", float64(10))
-	result, err := eval.Eval("add", []interface{}{
-		map[string]interface{}{"path": "/x"},
+	result, err := eval.Eval("add", []any{
+		map[string]any{"path": "/x"},
 		float64(5),
 	})
 	if err != nil {
@@ -531,5 +531,180 @@ func TestEvalAddWithPath(t *testing.T) {
 	f, ok := result.(float64)
 	if !ok || math.Abs(f-15) > 0.001 {
 		t.Errorf("add = %v, want 15", result)
+	}
+}
+
+func TestEvalAppendToArray(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{"a", "b"}
+	result, err := eval.Eval("append", []any{arr, "c"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 3 {
+		t.Fatalf("append result len = %d, want 3", len(r))
+	}
+	if r[2] != "c" {
+		t.Errorf("append[2] = %v, want 'c'", r[2])
+	}
+}
+
+func TestEvalAppendToEmptyArray(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{}
+	result, err := eval.Eval("append", []any{arr, "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 1 {
+		t.Fatalf("append to empty = %d, want 1", len(r))
+	}
+	if r[0] != "x" {
+		t.Errorf("append[0] = %v, want 'x'", r[0])
+	}
+}
+
+func TestEvalAppendToNonArray(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("append", []any{"not-array", "elem"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 1 {
+		t.Fatalf("append to non-array = %d, want 1", len(r))
+	}
+	if r[0] != "elem" {
+		t.Errorf("append[0] = %v, want 'elem'", r[0])
+	}
+}
+
+func TestEvalRemoveLastFromArray(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{"a", "b", "c"}
+	result, err := eval.Eval("removeLast", []any{arr})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 2 {
+		t.Fatalf("removeLast result len = %d, want 2", len(r))
+	}
+	if r[0] != "a" || r[1] != "b" {
+		t.Errorf("removeLast = %v, want [a b]", r)
+	}
+}
+
+func TestEvalRemoveLastFromSingleElement(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{"only"}
+	result, err := eval.Eval("removeLast", []any{arr})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 0 {
+		t.Fatalf("removeLast single = %d, want 0", len(r))
+	}
+}
+
+func TestEvalRemoveLastFromEmptyArray(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{}
+	result, err := eval.Eval("removeLast", []any{arr})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 0 {
+		t.Fatalf("removeLast empty = %d, want 0", len(r))
+	}
+}
+
+func TestEvalSliceWithEnd(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{"a", "b", "c", "d", "e"}
+	result, err := eval.Eval("slice", []any{arr, float64(1), float64(4)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 3 {
+		t.Fatalf("slice(1,4) len = %d, want 3", len(r))
+	}
+	if r[0] != "b" || r[1] != "c" || r[2] != "d" {
+		t.Errorf("slice(1,4) = %v, want [b c d]", r)
+	}
+}
+
+func TestEvalSliceNoEnd(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{"a", "b", "c", "d"}
+	result, err := eval.Eval("slice", []any{arr, float64(2)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 2 {
+		t.Fatalf("slice(2) len = %d, want 2", len(r))
+	}
+	if r[0] != "c" || r[1] != "d" {
+		t.Errorf("slice(2) = %v, want [c d]", r)
+	}
+}
+
+func TestEvalSliceFromZero(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{"a", "b", "c"}
+	result, err := eval.Eval("slice", []any{arr, float64(0), float64(2)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 2 {
+		t.Fatalf("slice(0,2) len = %d, want 2", len(r))
+	}
+	if r[0] != "a" || r[1] != "b" {
+		t.Errorf("slice(0,2) = %v, want [a b]", r)
+	}
+}
+
+func TestEvalSliceOutOfBounds(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{"a", "b"}
+	result, err := eval.Eval("slice", []any{arr, float64(5)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 0 {
+		t.Fatalf("slice(5) on 2-element array = %d, want 0", len(r))
+	}
+}
+
+func TestEvalSliceEmptyArray(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{}
+	result, err := eval.Eval("slice", []any{arr, float64(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 0 {
+		t.Fatalf("slice(0) on empty = %d, want 0", len(r))
+	}
+}
+
+func TestEvalSliceNonArray(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("slice", []any{"not-array", float64(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 0 {
+		t.Fatalf("slice on non-array = %d, want 0", len(r))
 	}
 }

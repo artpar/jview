@@ -27,6 +27,11 @@ func fixtureDir() string {
 	return filepath.Join(filepath.Dir(file), "..", "testdata")
 }
 
+func projectDir() string {
+	_, file, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(file), "..")
+}
+
 // TestE2EHelloFixture reads the actual hello.jsonl through file transport
 // into the engine with a mock renderer and validates the output.
 func TestE2EHelloFixture(t *testing.T) {
@@ -971,5 +976,53 @@ func TestE2EAudioTests(t *testing.T) {
 	}
 
 	t.Logf("%d/%d tests passed, %d assertions total", passed, len(results), totalAssertions)
+}
+
+func runSampleAppTests(t *testing.T, relPath string) {
+	t.Helper()
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+
+	results, err := RunTestFile(filepath.Join(projectDir(), relPath), mock, disp)
+	if err != nil {
+		t.Fatalf("RunTestFile: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("no tests found in " + relPath)
+	}
+
+	passed := 0
+	totalAssertions := 0
+	for _, r := range results {
+		totalAssertions += r.Assertions
+		if r.Passed {
+			passed++
+		} else {
+			t.Errorf("FAIL: %s: %s", r.Name, r.Error)
+		}
+	}
+
+	t.Logf("%d/%d tests passed, %d assertions total", passed, len(results), totalAssertions)
+}
+
+func TestE2EThemeSwitcherTests(t *testing.T) {
+	runSampleAppTests(t, "sample_apps/theme_switcher/prompt.jsonl")
+}
+
+func TestE2EDynamicListTests(t *testing.T) {
+	runSampleAppTests(t, "samples/dynamic_list.jsonl")
+}
+
+func TestE2EScrollableFeedTests(t *testing.T) {
+	runSampleAppTests(t, "sample_apps/scrollable_feed/prompt.jsonl")
+}
+
+func TestE2ESysinfoTests(t *testing.T) {
+	runSampleAppTests(t, "sample_apps/sysinfo/prompt.jsonl")
+}
+
+func TestE2ECalculatorV2Tests(t *testing.T) {
+	runSampleAppTests(t, "sample_apps/calculator/prompt.jsonl")
 }
 

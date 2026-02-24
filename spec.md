@@ -775,6 +775,9 @@ Functions registered via `defineFunction` are available in the same expression c
 | `contains` | str, substr | bool | String contains check |
 | `length` | collection_or_string | number | Array element count or string character count |
 | `negate` | num | number | Multiply by -1 |
+| `append` | array, element | array | Append element to array |
+| `removeLast` | array | array | Remove last element from array |
+| `slice` | array, start, end? | array | Extract sub-array from start to end (exclusive) |
 
 ---
 

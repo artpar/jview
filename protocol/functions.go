@@ -39,4 +39,9 @@ var FunctionRegistry = []FuncMeta{
 	{Name: "not", Args: "val", Desc: "boolean negation", Category: "logic"},
 	{Name: "or", Args: "a, b, ...", Desc: "short-circuit OR", Category: "logic", Lazy: true},
 	{Name: "and", Args: "a, b, ...", Desc: "short-circuit AND", Category: "logic", Lazy: true},
+
+	// Array functions
+	{Name: "append", Args: "array, element", Desc: "append element to array", Category: "array"},
+	{Name: "removeLast", Args: "array", Desc: "remove last element from array", Category: "array"},
+	{Name: "slice", Args: "array, start, end?", Desc: "extract sub-array from start to end (exclusive)", Category: "array"},
 }

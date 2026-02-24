@@ -84,6 +84,7 @@ func (m *MockRenderer) CreateView(surfaceID string, node *RenderNode) ViewHandle
 	m.handles[surfaceID][node.ComponentID] = h
 	m.types[h] = node.Type
 	m.Created = append(m.Created, CreatedView{SurfaceID: surfaceID, Node: node, Handle: h})
+	m.populateStyle(surfaceID, node)
 	return h
 }
 
@@ -91,6 +92,44 @@ func (m *MockRenderer) UpdateView(surfaceID string, handle ViewHandle, node *Ren
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.Updated = append(m.Updated, UpdatedView{SurfaceID: surfaceID, Handle: handle, Node: node})
+	m.populateStyle(surfaceID, node)
+}
+
+// populateStyle extracts style info from a RenderNode's StyleProps into the mock style store.
+// Only sets fields that have non-zero values, preserving any previously set style info.
+// Must be called with m.mu held.
+func (m *MockRenderer) populateStyle(surfaceID string, node *RenderNode) {
+	s := node.Style
+	if s.BackgroundColor == "" && s.TextColor == "" && s.FontSize == 0 &&
+		s.Opacity == 0 && s.FontWeight == "" && s.FontFamily == "" {
+		return
+	}
+	if m.styles == nil {
+		m.styles = make(map[string]map[string]StyleInfo)
+	}
+	if m.styles[surfaceID] == nil {
+		m.styles[surfaceID] = make(map[string]StyleInfo)
+	}
+	info := m.styles[surfaceID][node.ComponentID]
+	if s.BackgroundColor != "" {
+		info.BgColor = s.BackgroundColor
+	}
+	if s.TextColor != "" {
+		info.TextColor = s.TextColor
+	}
+	if s.FontSize != 0 {
+		info.FontSize = s.FontSize
+	}
+	if s.Opacity != 0 {
+		info.Opacity = s.Opacity
+	}
+	if s.FontWeight == "bold" {
+		info.Bold = true
+	}
+	if s.FontFamily != "" {
+		info.FontName = s.FontFamily
+	}
+	m.styles[surfaceID][node.ComponentID] = info
 }
 
 func (m *MockRenderer) SetChildren(surfaceID string, parentHandle ViewHandle, childHandles []ViewHandle) {

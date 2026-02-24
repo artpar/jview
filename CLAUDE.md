@@ -131,6 +131,8 @@ Every component and every feature gets a fixture in `testdata/`. Fixtures are:
 | `platform/darwin/viewquery.go/.h/.m` | ObjC view frame/style queries | Test infra |
 | `testdata/*.jsonl` | Fixture files used by E2E + screenshots | Data |
 | `testdata/*_test.jsonl` | Native e2e test fixtures with inline assertions | E2E |
+| `samples/dynamic_list.jsonl` | Dynamic list with add/remove + inline tests | E2E |
+| `sample_apps/*/prompt.jsonl` | Sample app cached JSONL with inline tests | E2E |
 
 ## Architecture
 
@@ -199,7 +201,7 @@ Full roadmap tracked in planning MCP (plan: `jview Roadmap`). Summary:
 Protocol parsing, engine core, 7 component bridges (Text, Row, Column, Card, Button, TextField, CheckBox), file transport, Makefile verify pipeline.
 
 ### Phase 2: Full Interactivity + Remaining Components — COMPLETE
-FunctionCall evaluator, validation, template expansion, 7 new components (Divider, Icon, Image, Slider, ChoicePicker, DateTimeInput, List).
+FunctionCall evaluator (17 built-in functions incl. array: append, removeLast, slice), validation, template expansion, 7 new components (Divider, Icon, Image, Slider, ChoicePicker, DateTimeInput, List).
 
 ### Phase 3: Media + Live Transport + Polish — COMPLETE
 Live agent connectivity and remaining A2UI components.

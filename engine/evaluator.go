@@ -11,7 +11,7 @@ import (
 type FuncDef struct {
 	Name   string
 	Params []string
-	Body   interface{}
+	Body   any
 }
 
 // Evaluator handles FunctionCall evaluation against a DataModel.
@@ -25,7 +25,7 @@ func NewEvaluator(dm *DataModel) *Evaluator {
 	return &Evaluator{dm: dm, customFuncs: make(map[string]*FuncDef)}
 }
 
-type evalFn func(e *Evaluator, args []interface{}) (interface{}, error)
+type evalFn func(e *Evaluator, args []any) (any, error)
 
 var dispatchMap map[string]evalFn
 var lazySet map[string]bool
@@ -61,6 +61,9 @@ func init() {
 		"not":         (*Evaluator).fnNot,
 		"or":          (*Evaluator).fnOrLazy,
 		"and":         (*Evaluator).fnAndLazy,
+		"append":      (*Evaluator).fnAppend,
+		"removeLast":  (*Evaluator).fnRemoveLast,
+		"slice":       (*Evaluator).fnSlice,
 	}
 
 	// Validate: every registry entry has an impl, and vice versa
@@ -80,7 +83,7 @@ func init() {
 
 // Eval evaluates a function call, resolving args recursively.
 // Args can be: string, float64, bool literals, map with "path" key, or map with "functionCall" key.
-func (e *Evaluator) Eval(name string, args []interface{}) (interface{}, error) {
+func (e *Evaluator) Eval(name string, args []any) (any, error) {
 	fn, ok := dispatchMap[name]
 	if ok {
 		if lazySet[name] {
@@ -102,7 +105,7 @@ func (e *Evaluator) Eval(name string, args []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		paramMap := make(map[string]interface{}, len(def.Params))
+		paramMap := make(map[string]any, len(def.Params))
 		for i, p := range def.Params {
 			paramMap[p] = resolved[i]
 		}
@@ -124,8 +127,8 @@ func (e *Evaluator) Eval(name string, args []interface{}) (interface{}, error) {
 
 // resolveArgs resolves each argument: literals pass through, path refs look up DataModel,
 // nested functionCalls recurse.
-func (e *Evaluator) resolveArgs(args []interface{}) ([]interface{}, error) {
-	resolved := make([]interface{}, len(args))
+func (e *Evaluator) resolveArgs(args []any) ([]any, error) {
+	resolved := make([]any, len(args))
 	for i, arg := range args {
 		val, err := e.resolveArg(arg)
 		if err != nil {
@@ -136,11 +139,11 @@ func (e *Evaluator) resolveArgs(args []interface{}) ([]interface{}, error) {
 	return resolved, nil
 }
 
-func (e *Evaluator) resolveArg(arg interface{}) (interface{}, error) {
+func (e *Evaluator) resolveArg(arg any) (any, error) {
 	switch v := arg.(type) {
 	case string, float64, bool:
 		return v, nil
-	case map[string]interface{}:
+	case map[string]any:
 		if path, ok := v["path"].(string); ok {
 			val, found := e.dm.Get(path)
 			if !found {
@@ -148,13 +151,13 @@ func (e *Evaluator) resolveArg(arg interface{}) (interface{}, error) {
 			}
 			return val, nil
 		}
-		if fc, ok := v["functionCall"].(map[string]interface{}); ok {
+		if fc, ok := v["functionCall"].(map[string]any); ok {
 			name, _ := fc["name"].(string)
-			rawArgs, _ := fc["args"].([]interface{})
+			rawArgs, _ := fc["args"].([]any)
 			return e.Eval(name, rawArgs)
 		}
 		// Plain object — recursively resolve each value
-		resolved := make(map[string]interface{}, len(v))
+		resolved := make(map[string]any, len(v))
 		for key, val := range v {
 			r, err := e.resolveArg(val)
 			if err != nil {
@@ -163,8 +166,8 @@ func (e *Evaluator) resolveArg(arg interface{}) (interface{}, error) {
 			resolved[key] = r
 		}
 		return resolved, nil
-	case []interface{}:
-		resolved := make([]interface{}, len(v))
+	case []any:
+		resolved := make([]any, len(v))
 		for i, val := range v {
 			r, err := e.resolveArg(val)
 			if err != nil {
@@ -179,7 +182,7 @@ func (e *Evaluator) resolveArg(arg interface{}) (interface{}, error) {
 }
 
 // PathsInArgs returns all data model paths referenced in the args tree.
-func PathsInArgs(args []interface{}) []string {
+func PathsInArgs(args []any) []string {
 	var paths []string
 	for _, arg := range args {
 		pathsInArg(arg, &paths)
@@ -187,16 +190,16 @@ func PathsInArgs(args []interface{}) []string {
 	return paths
 }
 
-func pathsInArg(arg interface{}, paths *[]string) {
-	m, ok := arg.(map[string]interface{})
+func pathsInArg(arg any, paths *[]string) {
+	m, ok := arg.(map[string]any)
 	if !ok {
 		return
 	}
 	if path, ok := m["path"].(string); ok {
 		*paths = append(*paths, path)
 	}
-	if fc, ok := m["functionCall"].(map[string]interface{}); ok {
-		if nestedArgs, ok := fc["args"].([]interface{}); ok {
+	if fc, ok := m["functionCall"].(map[string]any); ok {
+		if nestedArgs, ok := fc["args"].([]any); ok {
 			for _, a := range nestedArgs {
 				pathsInArg(a, paths)
 			}
@@ -204,7 +207,7 @@ func pathsInArg(arg interface{}, paths *[]string) {
 	}
 }
 
-func toString(v interface{}) string {
+func toString(v any) string {
 	if v == nil {
 		return ""
 	}
@@ -226,7 +229,7 @@ func toString(v interface{}) string {
 	}
 }
 
-func toFloat(v interface{}) (float64, error) {
+func toFloat(v any) (float64, error) {
 	switch val := v.(type) {
 	case float64:
 		return val, nil
@@ -241,7 +244,7 @@ func toFloat(v interface{}) (float64, error) {
 	}
 }
 
-func toBool(v interface{}) (bool, error) {
+func toBool(v any) (bool, error) {
 	switch val := v.(type) {
 	case bool:
 		return val, nil
@@ -256,7 +259,7 @@ func toBool(v interface{}) (bool, error) {
 
 // --- Function implementations ---
 
-func (e *Evaluator) fnConcat(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnConcat(args []any) (any, error) {
 	var b strings.Builder
 	for _, a := range args {
 		b.WriteString(toString(a))
@@ -264,7 +267,7 @@ func (e *Evaluator) fnConcat(args []interface{}) (interface{}, error) {
 	return b.String(), nil
 }
 
-func (e *Evaluator) fnFormat(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnFormat(args []any) (any, error) {
 	if len(args) < 1 {
 		return "", fmt.Errorf("format requires at least 1 arg")
 	}
@@ -276,28 +279,28 @@ func (e *Evaluator) fnFormat(args []interface{}) (interface{}, error) {
 	return tmpl, nil
 }
 
-func (e *Evaluator) fnToUpperCase(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnToUpperCase(args []any) (any, error) {
 	if len(args) < 1 {
 		return "", nil
 	}
 	return strings.ToUpper(toString(args[0])), nil
 }
 
-func (e *Evaluator) fnToLowerCase(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnToLowerCase(args []any) (any, error) {
 	if len(args) < 1 {
 		return "", nil
 	}
 	return strings.ToLower(toString(args[0])), nil
 }
 
-func (e *Evaluator) fnTrim(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnTrim(args []any) (any, error) {
 	if len(args) < 1 {
 		return "", nil
 	}
 	return strings.TrimSpace(toString(args[0])), nil
 }
 
-func (e *Evaluator) fnSubstring(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnSubstring(args []any) (any, error) {
 	if len(args) < 2 {
 		return "", fmt.Errorf("substring requires at least 2 args")
 	}
@@ -306,10 +309,7 @@ func (e *Evaluator) fnSubstring(args []interface{}) (interface{}, error) {
 	if err != nil {
 		return "", err
 	}
-	si := int(start)
-	if si < 0 {
-		si = 0
-	}
+	si := max(int(start), 0)
 	if si >= len(s) {
 		return "", nil
 	}
@@ -318,10 +318,7 @@ func (e *Evaluator) fnSubstring(args []interface{}) (interface{}, error) {
 		if err != nil {
 			return "", err
 		}
-		ei := int(end)
-		if ei > len(s) {
-			ei = len(s)
-		}
+		ei := min(int(end), len(s))
 		if ei <= si {
 			return "", nil
 		}
@@ -330,18 +327,18 @@ func (e *Evaluator) fnSubstring(args []interface{}) (interface{}, error) {
 	return s[si:], nil
 }
 
-func (e *Evaluator) fnLength(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnLength(args []any) (any, error) {
 	if len(args) < 1 {
 		return float64(0), nil
 	}
 	// Handle arrays — return element count
-	if arr, ok := args[0].([]interface{}); ok {
+	if arr, ok := args[0].([]any); ok {
 		return float64(len(arr)), nil
 	}
 	return float64(len(toString(args[0]))), nil
 }
 
-func (e *Evaluator) fnAdd(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnAdd(args []any) (any, error) {
 	if len(args) < 2 {
 		return float64(0), fmt.Errorf("add requires 2 args")
 	}
@@ -356,7 +353,7 @@ func (e *Evaluator) fnAdd(args []interface{}) (interface{}, error) {
 	return a + b, nil
 }
 
-func (e *Evaluator) fnSubtract(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnSubtract(args []any) (any, error) {
 	if len(args) < 2 {
 		return float64(0), fmt.Errorf("subtract requires 2 args")
 	}
@@ -371,7 +368,7 @@ func (e *Evaluator) fnSubtract(args []interface{}) (interface{}, error) {
 	return a - b, nil
 }
 
-func (e *Evaluator) fnMultiply(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnMultiply(args []any) (any, error) {
 	if len(args) < 2 {
 		return float64(0), fmt.Errorf("multiply requires 2 args")
 	}
@@ -386,7 +383,7 @@ func (e *Evaluator) fnMultiply(args []interface{}) (interface{}, error) {
 	return a * b, nil
 }
 
-func (e *Evaluator) fnDivide(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnDivide(args []any) (any, error) {
 	if len(args) < 2 {
 		return float64(0), fmt.Errorf("divide requires 2 args")
 	}
@@ -404,14 +401,14 @@ func (e *Evaluator) fnDivide(args []interface{}) (interface{}, error) {
 	return a / b, nil
 }
 
-func (e *Evaluator) fnEquals(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnEquals(args []any) (any, error) {
 	if len(args) < 2 {
 		return false, fmt.Errorf("equals requires 2 args")
 	}
 	return toString(args[0]) == toString(args[1]), nil
 }
 
-func (e *Evaluator) fnGreaterThan(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnGreaterThan(args []any) (any, error) {
 	if len(args) < 2 {
 		return false, fmt.Errorf("greaterThan requires 2 args")
 	}
@@ -426,7 +423,7 @@ func (e *Evaluator) fnGreaterThan(args []interface{}) (interface{}, error) {
 	return a > b, nil
 }
 
-func (e *Evaluator) fnNot(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnNot(args []any) (any, error) {
 	if len(args) < 1 {
 		return true, nil
 	}
@@ -438,7 +435,7 @@ func (e *Evaluator) fnNot(args []interface{}) (interface{}, error) {
 }
 
 // fnIfLazy resolves args lazily: only evaluates the chosen branch.
-func (e *Evaluator) fnIfLazy(rawArgs []interface{}) (interface{}, error) {
+func (e *Evaluator) fnIfLazy(rawArgs []any) (any, error) {
 	if len(rawArgs) < 3 {
 		return nil, fmt.Errorf("if requires 3 args (condition, trueVal, falseVal)")
 	}
@@ -457,7 +454,7 @@ func (e *Evaluator) fnIfLazy(rawArgs []interface{}) (interface{}, error) {
 }
 
 // fnOrLazy short-circuits: returns true on first truthy arg.
-func (e *Evaluator) fnOrLazy(rawArgs []interface{}) (interface{}, error) {
+func (e *Evaluator) fnOrLazy(rawArgs []any) (any, error) {
 	for _, a := range rawArgs {
 		val, err := e.resolveArg(a)
 		if err != nil {
@@ -475,7 +472,7 @@ func (e *Evaluator) fnOrLazy(rawArgs []interface{}) (interface{}, error) {
 }
 
 // fnAndLazy short-circuits: returns false on first falsy arg.
-func (e *Evaluator) fnAndLazy(rawArgs []interface{}) (interface{}, error) {
+func (e *Evaluator) fnAndLazy(rawArgs []any) (any, error) {
 	if len(rawArgs) == 0 {
 		return true, nil
 	}
@@ -495,7 +492,7 @@ func (e *Evaluator) fnAndLazy(rawArgs []interface{}) (interface{}, error) {
 	return true, nil
 }
 
-func (e *Evaluator) fnToNumber(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnToNumber(args []any) (any, error) {
 	if len(args) < 1 {
 		return float64(0), nil
 	}
@@ -506,14 +503,14 @@ func (e *Evaluator) fnToNumber(args []interface{}) (interface{}, error) {
 	return f, nil
 }
 
-func (e *Evaluator) fnToString(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnToString(args []any) (any, error) {
 	if len(args) < 1 {
 		return "", nil
 	}
 	return toString(args[0]), nil
 }
 
-func (e *Evaluator) fnCalc(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnCalc(args []any) (any, error) {
 	if len(args) < 3 {
 		return float64(0), fmt.Errorf("calc requires 3 args (operator, left, right)")
 	}
@@ -543,14 +540,14 @@ func (e *Evaluator) fnCalc(args []interface{}) (interface{}, error) {
 	}
 }
 
-func (e *Evaluator) fnContains(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnContains(args []any) (any, error) {
 	if len(args) < 2 {
 		return false, fmt.Errorf("contains requires 2 args")
 	}
 	return strings.Contains(toString(args[0]), toString(args[1])), nil
 }
 
-func (e *Evaluator) fnNegate(args []interface{}) (interface{}, error) {
+func (e *Evaluator) fnNegate(args []any) (any, error) {
 	if len(args) < 1 {
 		return float64(0), nil
 	}
@@ -559,4 +556,62 @@ func (e *Evaluator) fnNegate(args []interface{}) (interface{}, error) {
 		return float64(0), err
 	}
 	return -f, nil
+}
+
+func (e *Evaluator) fnAppend(args []any) (any, error) {
+	if len(args) < 2 {
+		return []any{}, fmt.Errorf("append requires 2 args (array, element)")
+	}
+	arr, ok := args[0].([]any)
+	if !ok {
+		return []any{args[1]}, nil
+	}
+	result := make([]any, len(arr), len(arr)+1)
+	copy(result, arr)
+	return append(result, args[1]), nil
+}
+
+func (e *Evaluator) fnRemoveLast(args []any) (any, error) {
+	if len(args) < 1 {
+		return []any{}, nil
+	}
+	arr, ok := args[0].([]any)
+	if !ok || len(arr) == 0 {
+		return []any{}, nil
+	}
+	return arr[:len(arr)-1], nil
+}
+
+func (e *Evaluator) fnSlice(args []any) (any, error) {
+	if len(args) < 2 {
+		return []any{}, fmt.Errorf("slice requires at least 2 args (array, start)")
+	}
+	arr, ok := args[0].([]any)
+	if !ok {
+		return []any{}, nil
+	}
+	start, err := toFloat(args[1])
+	if err != nil {
+		return []any{}, err
+	}
+	si := max(int(start), 0)
+	if si >= len(arr) {
+		return []any{}, nil
+	}
+	if len(args) >= 3 {
+		end, err := toFloat(args[2])
+		if err != nil {
+			return []any{}, err
+		}
+		ei := min(int(end), len(arr))
+		if ei <= si {
+			return []any{}, nil
+		}
+		result := make([]any, ei-si)
+		copy(result, arr[si:ei])
+		return result, nil
+	}
+	result := make([]any, len(arr)-si)
+	copy(result, arr[si:])
+	return result, nil
 }

@@ -226,7 +226,7 @@ Four layers:
 All tests run with `-race` detection enabled.
 
 ```bash
-make test          # Headless unit + integration tests (300+ tests)
+make test          # Headless unit + integration tests (318 tests)
 make verify        # Build + screenshot capture for all fixtures (31 fixtures)
 make check         # Both (the gate)
 
