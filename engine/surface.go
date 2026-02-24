@@ -24,8 +24,8 @@ type Surface struct {
 	// validationErrors tracks current validation errors: componentID → []errorMessages
 	validationErrors map[string][]string
 
-	// ActionHandler is called when a component triggers a server action.
-	ActionHandler func(surfaceID string, action *protocol.Action, eventData map[string]interface{})
+	// ActionHandler is called when a component triggers a server-bound event.
+	ActionHandler func(surfaceID string, event *protocol.EventDef, data map[string]interface{})
 }
 
 func NewSurface(id string, rend renderer.Renderer, dispatch renderer.Dispatcher) *Surface {
@@ -198,14 +198,90 @@ func (s *Surface) renderComponents(componentIDs []string) {
 }
 
 // resolveDataRefs reads each DataRefs path from the data model and returns a map.
-func (s *Surface) resolveDataRefs(action *protocol.Action) map[string]interface{} {
-	result := make(map[string]interface{}, len(action.DataRefs))
-	for _, path := range action.DataRefs {
+func (s *Surface) resolveDataRefs(event *protocol.EventDef) map[string]interface{} {
+	result := make(map[string]interface{}, len(event.DataRefs))
+	for _, path := range event.DataRefs {
 		if val, ok := s.dm.Get(path); ok {
 			result[path] = val
 		}
 	}
 	return result
+}
+
+// executeFunctionCall handles client-side function calls from button actions.
+func (s *Surface) executeFunctionCall(fc *protocol.ActionFuncCall) {
+	switch fc.Call {
+	case "updateDataModel":
+		s.executeUpdateDataModel(fc.Args)
+	default:
+		log.Printf("surface %s: unknown functionCall: %s", s.id, fc.Call)
+	}
+}
+
+// executeUpdateDataModel applies data model operations from a functionCall's args.
+// Args is expected to be map[string]interface{} with an "ops" key containing an array of ops.
+// Each op has {op, path, value} where value can be a dynamic (functionCall/path ref).
+func (s *Surface) executeUpdateDataModel(args interface{}) {
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		log.Printf("surface %s: updateDataModel args not a map", s.id)
+		return
+	}
+	opsRaw, ok := argsMap["ops"]
+	if !ok {
+		log.Printf("surface %s: updateDataModel missing ops", s.id)
+		return
+	}
+	ops, ok := opsRaw.([]interface{})
+	if !ok {
+		log.Printf("surface %s: updateDataModel ops not an array", s.id)
+		return
+	}
+
+	evaluator := NewEvaluator(s.dm)
+	var allChanged []string
+
+	for _, opRaw := range ops {
+		opMap, ok := opRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		opType, _ := opMap["op"].(string)
+		path, _ := opMap["path"].(string)
+		if opType == "" || path == "" {
+			continue
+		}
+
+		switch opType {
+		case "add", "replace":
+			value, err := evaluator.resolveArg(opMap["value"])
+			if err != nil {
+				log.Printf("surface %s: resolve value error: %v", s.id, err)
+				continue
+			}
+			changed, err := s.dm.Set(path, value)
+			if err != nil {
+				log.Printf("surface %s: data op error: %v", s.id, err)
+				continue
+			}
+			allChanged = append(allChanged, changed...)
+		case "remove":
+			changed, err := s.dm.Delete(path)
+			if err != nil {
+				log.Printf("surface %s: data op error: %v", s.id, err)
+				continue
+			}
+			allChanged = append(allChanged, changed...)
+		}
+	}
+
+	if len(allChanged) == 0 {
+		return
+	}
+	affected := s.tracker.Affected(allChanged)
+	if len(affected) > 0 {
+		s.renderComponents(affected)
+	}
 }
 
 func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.RenderNode) {
@@ -224,12 +300,13 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 		if comp.Props.OnClick != nil && comp.Props.OnClick.Action != nil {
 			action := comp.Props.OnClick.Action
 			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "click", func(data string) {
-				if s.ActionHandler != nil {
-					resolved := s.resolveDataRefs(action)
-					s.ActionHandler(s.id, action, resolved)
-				} else {
-					fmt.Printf("action: %s %s (surface %s, component %s)\n",
-						action.Type, action.Name, s.id, comp.ComponentID)
+				if action.Event != nil {
+					resolved := s.resolveDataRefs(action.Event)
+					if s.ActionHandler != nil {
+						s.ActionHandler(s.id, action.Event, resolved)
+					}
+				} else if action.FunctionCall != nil {
+					s.executeFunctionCall(action.FunctionCall)
 				}
 			})
 			node.Callbacks["click"] = cbID

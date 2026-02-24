@@ -72,8 +72,7 @@ func RunTransportContractTests(t *testing.T, factory func() Transport) {
 				t.Fatalf("SendAction panicked: %v", r)
 			}
 		}()
-		tr.SendAction("surface1", &protocol.Action{
-			Type: "serverAction",
+		tr.SendAction("surface1", &protocol.EventDef{
 			Name: "test",
 		}, map[string]interface{}{"key": "value"})
 	})

@@ -162,21 +162,21 @@ func TestButtonCallbackFires(t *testing.T) {
 	disp := &renderer.MockDispatcher{}
 	sess := NewSession(mock, disp)
 
-	var firedAction string
+	var firedEvent string
 	// Hook into the surface's action handler after creation
 	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","style":"primary","onClick":{"action":{"type":"serverAction","name":"doThing"}}}}]}`)
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","style":"primary","onClick":{"action":{"event":{"name":"doThing"}}}}}]}`)
 
 	// Set action handler on the surface
 	if surf, ok := sess.surfaces["s1"]; ok {
-		surf.ActionHandler = func(sid string, action *protocol.Action, data map[string]interface{}) {
-			firedAction = action.Name
+		surf.ActionHandler = func(sid string, event *protocol.EventDef, data map[string]interface{}) {
+			firedEvent = event.Name
 		}
 	}
 
 	mock.InvokeCallback("s1", "btn", "click", "")
-	if firedAction != "doThing" {
-		t.Errorf("firedAction = %q, want doThing", firedAction)
+	if firedEvent != "doThing" {
+		t.Errorf("firedEvent = %q, want doThing", firedEvent)
 	}
 }
 
@@ -371,7 +371,7 @@ func TestContactFormFixtureFull(t *testing.T) {
 
 	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"form","title":"Contact Form","width":500,"height":500}
 {"type":"updateDataModel","surfaceId":"form","ops":[{"op":"add","path":"/name","value":""},{"op":"add","path":"/email","value":""},{"op":"add","path":"/subscribe","value":false}]}
-{"type":"updateComponents","surfaceId":"form","components":[{"componentId":"root","type":"Column","props":{"gap":16,"padding":20},"children":["title","nameField","emailField","previewName","submitBtn"]},{"componentId":"title","type":"Text","props":{"content":"Contact Us","variant":"h2"}},{"componentId":"nameField","type":"TextField","props":{"placeholder":"Enter your name","value":{"path":"/name"},"dataBinding":"/name"}},{"componentId":"emailField","type":"TextField","props":{"placeholder":"you@example.com","value":{"path":"/email"},"dataBinding":"/email"}},{"componentId":"previewName","type":"Text","props":{"content":{"path":"/name"},"variant":"body"}},{"componentId":"submitBtn","type":"Button","props":{"label":"Submit","style":"primary","onClick":{"action":{"type":"serverAction","name":"submitForm","dataRefs":["/name","/email","/subscribe"]}}}}]}`)
+{"type":"updateComponents","surfaceId":"form","components":[{"componentId":"root","type":"Column","props":{"gap":16,"padding":20},"children":["title","nameField","emailField","previewName","submitBtn"]},{"componentId":"title","type":"Text","props":{"content":"Contact Us","variant":"h2"}},{"componentId":"nameField","type":"TextField","props":{"placeholder":"Enter your name","value":{"path":"/name"},"dataBinding":"/name"}},{"componentId":"emailField","type":"TextField","props":{"placeholder":"you@example.com","value":{"path":"/email"},"dataBinding":"/email"}},{"componentId":"previewName","type":"Text","props":{"content":{"path":"/name"},"variant":"body"}},{"componentId":"submitBtn","type":"Button","props":{"label":"Submit","style":"primary","onClick":{"action":{"event":{"name":"submitForm","dataRefs":["/name","/email","/subscribe"]}}}}}]}`)
 
 	// Window + all 6 components created
 	if len(mock.Windows) != 1 {
@@ -627,7 +627,7 @@ func TestResolveDataRefs(t *testing.T) {
 
 	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
 {"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/form/name","value":"Alice"},{"op":"add","path":"/form/email","value":"alice@example.com"}]}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Submit","onClick":{"action":{"type":"serverAction","name":"submit","dataRefs":["/form/name","/form/email","/form/missing"]}}}}]}`)
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Submit","onClick":{"action":{"event":{"name":"submit","dataRefs":["/form/name","/form/email","/form/missing"]}}}}}]}`)
 
 	// Verify button was created
 	if len(mock.Created) == 0 {
@@ -640,8 +640,7 @@ func TestResolveDataRefs(t *testing.T) {
 		t.Fatal("surface s1 not found")
 	}
 
-	result := surf.resolveDataRefs(&protocol.Action{
-		Type:     "serverAction",
+	result := surf.resolveDataRefs(&protocol.EventDef{
 		Name:     "submit",
 		DataRefs: []string{"/form/name", "/form/email", "/form/missing"},
 	})
@@ -662,18 +661,18 @@ func TestOnActionPropagation(t *testing.T) {
 
 	var received struct {
 		surfaceID string
-		action    *protocol.Action
+		event     *protocol.EventDef
 		data      map[string]interface{}
 	}
-	sess.OnAction = func(surfaceID string, action *protocol.Action, data map[string]interface{}) {
+	sess.OnAction = func(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {
 		received.surfaceID = surfaceID
-		received.action = action
+		received.event = event
 		received.data = data
 	}
 
 	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
 {"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/count","value":42}]}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Click","onClick":{"action":{"type":"serverAction","name":"increment","dataRefs":["/count"]}}}}]}`)
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Click","onClick":{"action":{"event":{"name":"increment","dataRefs":["/count"]}}}}}]}`)
 
 	// Click the button
 	mock.InvokeCallback("s1", "btn", "click", "")
@@ -681,11 +680,11 @@ func TestOnActionPropagation(t *testing.T) {
 	if received.surfaceID != "s1" {
 		t.Errorf("surfaceID = %q, want s1", received.surfaceID)
 	}
-	if received.action == nil {
-		t.Fatal("action not received")
+	if received.event == nil {
+		t.Fatal("event not received")
 	}
-	if received.action.Name != "increment" {
-		t.Errorf("action.Name = %q, want increment", received.action.Name)
+	if received.event.Name != "increment" {
+		t.Errorf("event.Name = %q, want increment", received.event.Name)
 	}
 	// Check that DataRefs were resolved
 	if received.data["/count"] != float64(42) {

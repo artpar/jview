@@ -12,8 +12,8 @@ type Session struct {
 	rend     renderer.Renderer
 	dispatch renderer.Dispatcher
 
-	// OnAction is called when any surface triggers a server action.
-	OnAction func(surfaceID string, action *protocol.Action, data map[string]interface{})
+	// OnAction is called when any surface triggers a server-bound event.
+	OnAction func(surfaceID string, event *protocol.EventDef, data map[string]interface{})
 }
 
 func NewSession(rend renderer.Renderer, dispatch renderer.Dispatcher) *Session {

@@ -312,6 +312,149 @@ func TestPathsInArgs(t *testing.T) {
 	}
 }
 
+func TestEvalIf(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("if", []interface{}{true, "yes", "no"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != "yes" {
+		t.Errorf("if(true) = %v, want 'yes'", result)
+	}
+	result, err = eval.Eval("if", []interface{}{false, "yes", "no"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != "no" {
+		t.Errorf("if(false) = %v, want 'no'", result)
+	}
+}
+
+func TestEvalOr(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("or", []interface{}{false, false, true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != true {
+		t.Errorf("or(false,false,true) = %v, want true", result)
+	}
+	result, err = eval.Eval("or", []interface{}{false, false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != false {
+		t.Errorf("or(false,false) = %v, want false", result)
+	}
+}
+
+func TestEvalAnd(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("and", []interface{}{true, true, true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != true {
+		t.Errorf("and(true,true,true) = %v, want true", result)
+	}
+	result, err = eval.Eval("and", []interface{}{true, false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != false {
+		t.Errorf("and(true,false) = %v, want false", result)
+	}
+}
+
+func TestEvalToNumber(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("toNumber", []interface{}{"42"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != float64(42) {
+		t.Errorf("toNumber('42') = %v, want 42", result)
+	}
+}
+
+func TestEvalToString(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("toString", []interface{}{float64(42)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != "42" {
+		t.Errorf("toString(42) = %v, want '42'", result)
+	}
+}
+
+func TestEvalCalc(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	cases := []struct {
+		op   string
+		a, b float64
+		want float64
+	}{
+		{"+", 2, 3, 5},
+		{"-", 10, 3, 7},
+		{"*", 4, 5, 20},
+		{"/", 10, 2, 5},
+	}
+	for _, tc := range cases {
+		result, err := eval.Eval("calc", []interface{}{tc.op, tc.a, tc.b})
+		if err != nil {
+			t.Fatalf("calc(%s, %v, %v): %v", tc.op, tc.a, tc.b, err)
+		}
+		if result != tc.want {
+			t.Errorf("calc(%s, %v, %v) = %v, want %v", tc.op, tc.a, tc.b, result, tc.want)
+		}
+	}
+}
+
+func TestEvalCalcDivZero(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	_, err := eval.Eval("calc", []interface{}{"/", float64(1), float64(0)})
+	if err == nil {
+		t.Error("expected division by zero error")
+	}
+}
+
+func TestEvalContains(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("contains", []interface{}{"hello world", "world"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != true {
+		t.Errorf("contains('hello world','world') = %v, want true", result)
+	}
+	result, err = eval.Eval("contains", []interface{}{"hello", "xyz"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != false {
+		t.Errorf("contains('hello','xyz') = %v, want false", result)
+	}
+}
+
+func TestEvalNegate(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("negate", []interface{}{float64(42)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != float64(-42) {
+		t.Errorf("negate(42) = %v, want -42", result)
+	}
+	result, err = eval.Eval("negate", []interface{}{float64(-5)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != float64(5) {
+		t.Errorf("negate(-5) = %v, want 5", result)
+	}
+}
+
 func TestEvalAddWithPath(t *testing.T) {
 	eval, dm := newTestEvaluator()
 	dm.Set("/x", float64(10))

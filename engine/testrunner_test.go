@@ -114,7 +114,7 @@ func TestRunnerSimulateAndAssert(t *testing.T) {
 func TestRunnerAssertAction(t *testing.T) {
 	jsonl := `{"type":"createSurface","surfaceId":"s1","title":"T"}
 {"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/x","value":"hello"}]}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"type":"serverAction","name":"doIt","dataRefs":["/x"]}}}}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"event":{"name":"doIt","dataRefs":["/x"]}}}}}]}
 {"type":"test","surfaceId":"s1","name":"action test","steps":[{"simulate":"event","componentId":"btn","event":"click"},{"assert":"action","name":"doIt","data":{"/x":"hello"}}]}`
 
 	results := runTestHelper(t, jsonl)
@@ -209,7 +209,7 @@ func TestRunnerSideEffectsPersist(t *testing.T) {
 
 func TestRunnerActionsClearBetweenTests(t *testing.T) {
 	jsonl := `{"type":"createSurface","surfaceId":"s1","title":"T"}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"type":"serverAction","name":"doIt"}}}}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"event":{"name":"doIt"}}}}}]}
 {"type":"test","surfaceId":"s1","name":"fire action","steps":[{"simulate":"event","componentId":"btn","event":"click"},{"assert":"action","name":"doIt"}]}
 {"type":"test","surfaceId":"s1","name":"action cleared","steps":[{"assert":"action","name":"doIt"}]}`
 
@@ -629,7 +629,7 @@ func TestRunnerNotExistsWrongSurface(t *testing.T) {
 func TestRunnerActionNameOnly(t *testing.T) {
 	// Assert action by name only, no data check
 	jsonl := `{"type":"createSurface","surfaceId":"s1","title":"T"}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"type":"serverAction","name":"doIt"}}}}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"event":{"name":"doIt"}}}}}]}
 {"type":"test","surfaceId":"s1","name":"name only","steps":[{"simulate":"event","componentId":"btn","event":"click"},{"assert":"action","name":"doIt"}]}`
 	results := runTestHelper(t, jsonl)
 	expectPass(t, results, 0)
@@ -637,7 +637,7 @@ func TestRunnerActionNameOnly(t *testing.T) {
 
 func TestRunnerActionWrongName(t *testing.T) {
 	jsonl := `{"type":"createSurface","surfaceId":"s1","title":"T"}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"type":"serverAction","name":"doIt"}}}}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"event":{"name":"doIt"}}}}}]}
 {"type":"test","surfaceId":"s1","name":"wrong name","steps":[{"simulate":"event","componentId":"btn","event":"click"},{"assert":"action","name":"otherAction"}]}`
 	results := runTestHelper(t, jsonl)
 	expectFail(t, results, 0, "no action")
@@ -646,7 +646,7 @@ func TestRunnerActionWrongName(t *testing.T) {
 func TestRunnerActionDataMismatch(t *testing.T) {
 	jsonl := `{"type":"createSurface","surfaceId":"s1","title":"T"}
 {"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/x","value":"actual"}]}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"type":"serverAction","name":"doIt","dataRefs":["/x"]}}}}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"event":{"name":"doIt","dataRefs":["/x"]}}}}}]}
 {"type":"test","surfaceId":"s1","name":"wrong data","steps":[{"simulate":"event","componentId":"btn","event":"click"},{"assert":"action","name":"doIt","data":{"/x":"expected"}}]}`
 	results := runTestHelper(t, jsonl)
 	expectFail(t, results, 0, "assertAction")
@@ -655,7 +655,7 @@ func TestRunnerActionDataMismatch(t *testing.T) {
 func TestRunnerActionDataKeyMissing(t *testing.T) {
 	// Action has no data, but test asserts on data key → should fail
 	jsonl := `{"type":"createSurface","surfaceId":"s1","title":"T"}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"type":"serverAction","name":"doIt"}}}}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"event":{"name":"doIt"}}}}}]}
 {"type":"test","surfaceId":"s1","name":"missing key","steps":[{"simulate":"event","componentId":"btn","event":"click"},{"assert":"action","name":"doIt","data":{"/x":"hello"}}]}`
 	results := runTestHelper(t, jsonl)
 	expectFail(t, results, 0, "not present")
@@ -672,7 +672,7 @@ func TestRunnerActionExtraDataInActual(t *testing.T) {
 	// Action has extra keys beyond what test asserts — should pass (subset)
 	jsonl := `{"type":"createSurface","surfaceId":"s1","title":"T"}
 {"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/x","value":"hello"},{"op":"add","path":"/y","value":"world"}]}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"type":"serverAction","name":"doIt","dataRefs":["/x","/y"]}}}}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"event":{"name":"doIt","dataRefs":["/x","/y"]}}}}}]}
 {"type":"test","surfaceId":"s1","name":"subset data","steps":[{"simulate":"event","componentId":"btn","event":"click"},{"assert":"action","name":"doIt","data":{"/x":"hello"}}]}`
 	results := runTestHelper(t, jsonl)
 	expectPass(t, results, 0)
@@ -846,7 +846,7 @@ func TestRunnerButtonActionWithDataRefs(t *testing.T) {
 	// Full flow: set data, click button, assert action carries resolved data
 	jsonl := `{"type":"createSurface","surfaceId":"s1","title":"T"}
 {"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/name","value":""},{"op":"add","path":"/email","value":""}]}
-{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"nameField","type":"TextField","props":{"value":{"path":"/name"},"dataBinding":"/name"}},{"componentId":"emailField","type":"TextField","props":{"value":{"path":"/email"},"dataBinding":"/email"}},{"componentId":"btn","type":"Button","props":{"label":"Submit","onClick":{"action":{"type":"serverAction","name":"submit","dataRefs":["/name","/email"]}}}}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"nameField","type":"TextField","props":{"value":{"path":"/name"},"dataBinding":"/name"}},{"componentId":"emailField","type":"TextField","props":{"value":{"path":"/email"},"dataBinding":"/email"}},{"componentId":"btn","type":"Button","props":{"label":"Submit","onClick":{"action":{"event":{"name":"submit","dataRefs":["/name","/email"]}}}}}]}
 {"type":"test","surfaceId":"s1","name":"fill and submit","steps":[{"simulate":"event","componentId":"nameField","event":"change","eventData":"Alice"},{"simulate":"event","componentId":"emailField","event":"change","eventData":"alice@test.com"},{"simulate":"event","componentId":"btn","event":"click"},{"assert":"action","name":"submit","data":{"/name":"Alice","/email":"alice@test.com"}}]}`
 	results := runTestHelper(t, jsonl)
 	expectPass(t, results, 0)

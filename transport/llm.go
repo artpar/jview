@@ -24,7 +24,7 @@ type LLMConfig struct {
 
 type actionPayload struct {
 	SurfaceID string
-	Action    *protocol.Action
+	Event     *protocol.EventDef
 	Data      map[string]interface{}
 }
 
@@ -79,9 +79,9 @@ func (t *LLMTransport) Stop() {
 	})
 }
 
-func (t *LLMTransport) SendAction(surfaceID string, action *protocol.Action, data map[string]interface{}) {
+func (t *LLMTransport) SendAction(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {
 	select {
-	case t.actions <- actionPayload{SurfaceID: surfaceID, Action: action, Data: data}:
+	case t.actions <- actionPayload{SurfaceID: surfaceID, Event: event, Data: data}:
 	case <-t.done:
 	}
 }
@@ -325,11 +325,11 @@ func (t *LLMTransport) doTurnRaw(ctx context.Context, history []anyllm.Message) 
 	return history
 }
 
-// formatAction formats a user action into a message string for the LLM.
+// formatAction formats a user event into a message string for the LLM.
 func (t *LLMTransport) formatAction(ap actionPayload) string {
 	parts := []string{
 		fmt.Sprintf("User action on surface %q:", ap.SurfaceID),
-		fmt.Sprintf("  action: %s", ap.Action.Name),
+		fmt.Sprintf("  event: %s", ap.Event.Name),
 	}
 	if len(ap.Data) > 0 {
 		data, _ := json.MarshalIndent(ap.Data, "  ", "  ")

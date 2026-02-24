@@ -52,6 +52,22 @@ func (e *Evaluator) Eval(name string, args []interface{}) (interface{}, error) {
 		return e.fnGreaterThan(resolved)
 	case "not":
 		return e.fnNot(resolved)
+	case "if":
+		return e.fnIf(resolved)
+	case "or":
+		return e.fnOr(resolved)
+	case "and":
+		return e.fnAnd(resolved)
+	case "toNumber":
+		return e.fnToNumber(resolved)
+	case "toString":
+		return e.fnToString(resolved)
+	case "calc":
+		return e.fnCalc(resolved)
+	case "contains":
+		return e.fnContains(resolved)
+	case "negate":
+		return e.fnNegate(resolved)
 	default:
 		return nil, fmt.Errorf("unknown function: %s", name)
 	}
@@ -347,4 +363,113 @@ func (e *Evaluator) fnNot(args []interface{}) (interface{}, error) {
 		return false, err
 	}
 	return !b, nil
+}
+
+func (e *Evaluator) fnIf(args []interface{}) (interface{}, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("if requires 3 args (condition, trueVal, falseVal)")
+	}
+	cond, err := toBool(args[0])
+	if err != nil {
+		return nil, err
+	}
+	if cond {
+		return args[1], nil
+	}
+	return args[2], nil
+}
+
+func (e *Evaluator) fnOr(args []interface{}) (interface{}, error) {
+	for _, a := range args {
+		b, err := toBool(a)
+		if err != nil {
+			return false, err
+		}
+		if b {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (e *Evaluator) fnAnd(args []interface{}) (interface{}, error) {
+	if len(args) == 0 {
+		return true, nil
+	}
+	for _, a := range args {
+		b, err := toBool(a)
+		if err != nil {
+			return false, err
+		}
+		if !b {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (e *Evaluator) fnToNumber(args []interface{}) (interface{}, error) {
+	if len(args) < 1 {
+		return float64(0), nil
+	}
+	f, err := toFloat(args[0])
+	if err != nil {
+		return float64(0), err
+	}
+	return f, nil
+}
+
+func (e *Evaluator) fnToString(args []interface{}) (interface{}, error) {
+	if len(args) < 1 {
+		return "", nil
+	}
+	return toString(args[0]), nil
+}
+
+func (e *Evaluator) fnCalc(args []interface{}) (interface{}, error) {
+	if len(args) < 3 {
+		return float64(0), fmt.Errorf("calc requires 3 args (operator, left, right)")
+	}
+	op := toString(args[0])
+	left, err := toFloat(args[1])
+	if err != nil {
+		return float64(0), err
+	}
+	right, err := toFloat(args[2])
+	if err != nil {
+		return float64(0), err
+	}
+	switch op {
+	case "+":
+		return left + right, nil
+	case "-":
+		return left - right, nil
+	case "*":
+		return left * right, nil
+	case "/":
+		if right == 0 {
+			return float64(0), fmt.Errorf("division by zero")
+		}
+		return left / right, nil
+	default:
+		return float64(0), fmt.Errorf("unknown operator: %s", op)
+	}
+}
+
+func (e *Evaluator) fnContains(args []interface{}) (interface{}, error) {
+	if len(args) < 2 {
+		return false, fmt.Errorf("contains requires 2 args")
+	}
+	return strings.Contains(toString(args[0]), toString(args[1])), nil
+}
+
+func (e *Evaluator) fnNegate(args []interface{}) (interface{}, error) {
+	if len(args) < 1 {
+		return float64(0), nil
+	}
+	f, err := toFloat(args[0])
+	if err != nil {
+		return float64(0), err
+	}
+	return -f, nil
 }

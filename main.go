@@ -159,10 +159,10 @@ func main() {
 	rend := darwin.NewRenderer()
 	sess := engine.NewSession(rend, disp)
 
-	// Wire actions for LLM transport
+	// Wire events for LLM transport
 	if lt, ok := tr.(*transport.LLMTransport); ok {
-		sess.OnAction = func(surfaceID string, action *protocol.Action, data map[string]interface{}) {
-			lt.SendAction(surfaceID, action, data)
+		sess.OnAction = func(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {
+			lt.SendAction(surfaceID, event, data)
 		}
 	}
 

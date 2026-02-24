@@ -214,7 +214,7 @@ AVAILABLE COMPONENTS:
 - Row: Horizontal layout. Props: gap (int), padding (int), justify ("start"|"center"|"end"|"spaceBetween"|"spaceAround"|"fillEqually"), align ("start"|"center"|"end"|"stretch")
 - Column: Vertical layout. Props: gap (int), padding (int), justify, align (same values as Row)
 - Card: Titled container. Props: title (string), subtitle (string)
-- Button: Clickable button. Props: label (string), style ("primary"|"secondary"|"destructive"), onClick.action.type ("serverAction"), onClick.action.name (string), onClick.action.dataRefs (array of JSON pointers)
+- Button: Clickable button. Props: label (string), style ("primary"|"secondary"|"destructive"), onClick.action.event.name (string), onClick.action.event.dataRefs (array of JSON pointers), onClick.action.functionCall.call (string), onClick.action.functionCall.args (object)
 - TextField: Text input. Props: placeholder (string), value (string), dataBinding (JSON pointer)
 - CheckBox: Toggle. Props: label (string), checked (bool), dataBinding (JSON pointer)
 - Slider: Range input. Props: min (number), max (number), step (number), sliderValue (number), dataBinding (JSON pointer)

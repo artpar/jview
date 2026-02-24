@@ -44,10 +44,10 @@ func RunTests(r io.Reader, rend renderer.Renderer, disp renderer.Dispatcher) ([]
 
 	// Collect actions fired during tests
 	var actions []CapturedAction
-	sess.OnAction = func(surfaceID string, action *protocol.Action, data map[string]interface{}) {
+	sess.OnAction = func(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {
 		actions = append(actions, CapturedAction{
 			SurfaceID: surfaceID,
-			Name:      action.Name,
+			Name:      event.Name,
 			Data:      data,
 		})
 	}
@@ -88,7 +88,7 @@ func executeTest(sess *Session, rend renderer.Renderer, actions *[]CapturedActio
 	for i, step := range tm.Steps {
 		var errMsg string
 		if step.Simulate != "" {
-			errMsg = executeSimulate(rend, tm.SurfaceID, step)
+			errMsg = executeSimulate(sess, rend, tm.SurfaceID, step)
 		} else if step.Assert != "" {
 			errMsg = executeAssert(sess, rend, actions, tm.SurfaceID, step)
 			result.Assertions++
@@ -103,10 +103,19 @@ func executeTest(sess *Session, rend renderer.Renderer, actions *[]CapturedActio
 	return result
 }
 
-func executeSimulate(rend renderer.Renderer, surfaceID string, step protocol.TestStep) string {
+func executeSimulate(sess *Session, rend renderer.Renderer, surfaceID string, step protocol.TestStep) string {
 	switch step.Simulate {
 	case "event":
 		rend.InvokeCallback(surfaceID, step.ComponentID, step.Event, step.EventData)
+		return ""
+	case "updateDataModel":
+		surf, ok := sess.surfaces[surfaceID]
+		if !ok {
+			return fmt.Sprintf("surface %q not found", surfaceID)
+		}
+		surf.HandleUpdateDataModel(protocol.UpdateDataModel{
+			Ops: []protocol.DataModelOp{{Op: "replace", Path: step.Path, Value: step.Value}},
+		})
 		return ""
 	default:
 		return fmt.Sprintf("unknown simulate type: %s", step.Simulate)

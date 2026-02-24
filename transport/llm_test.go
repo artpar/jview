@@ -305,8 +305,7 @@ func TestLLMTransportSendActionTriggersNewTurn(t *testing.T) {
 	}
 
 	// Send an action to trigger turn 2
-	tr.SendAction("s1", &protocol.Action{
-		Type: "serverAction",
+	tr.SendAction("s1", &protocol.EventDef{
 		Name: "increment",
 	}, map[string]interface{}{"count": float64(0)})
 

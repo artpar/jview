@@ -34,6 +34,8 @@ Opens a new native window.
 | title | string | yes | | Window title |
 | width | int | no | 800 | Window width in points |
 | height | int | no | 600 | Window height in points |
+| backgroundColor | string | no | system | Window background color (`#RRGGBB`) |
+| padding | int | no | 20 | Root view inset in points (-1 for edge-to-edge) |
 
 Duplicate `createSurface` for the same `surfaceId` is silently ignored.
 
@@ -204,7 +206,7 @@ Either a static array of component IDs:
 "children": ["a", "b", "c"]
 ```
 
-Or a template for dynamic expansion (Phase 2):
+Or a template for dynamic expansion:
 
 ```json
 "children": {
@@ -228,7 +230,7 @@ Any string, number, or boolean property can be either a literal or a data model 
 "content": {"path": "/user/name"}
 ```
 
-**Function call (Phase 2):**
+**Function call:**
 ```json
 "content": {"functionCall": {"name": "concat", "args": ["Hello, ", {"path": "/name"}]}}
 ```
@@ -279,7 +281,7 @@ Titled container (NSBox).
 
 ### Button
 
-Clickable button with server action.
+Clickable button with action (event or functionCall).
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
@@ -314,29 +316,211 @@ Toggle with optional two-way data binding.
 | dataBinding | string | | JSON Pointer for two-way binding |
 | onToggle | EventAction | | Action to fire on toggle |
 
+### Slider
+
+Range input with optional two-way data binding.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| min | DynamicNumber | 0 | Minimum value |
+| max | DynamicNumber | 100 | Maximum value |
+| step | DynamicNumber | 1 | Step increment |
+| sliderValue | DynamicNumber | 0 | Current value |
+| dataBinding | string | | JSON Pointer for two-way binding |
+
+### Image
+
+Displays an image from a URL.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| src | DynamicString | `""` | Image URL |
+| alt | DynamicString | `""` | Accessibility description |
+| width | int | | Fixed width in points |
+| height | int | | Fixed height in points |
+
+### Icon
+
+Displays an SF Symbol icon.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| name | DynamicString | `""` | SF Symbol name (e.g. `star.fill`) |
+| size | int | 16 | Icon size in points |
+
+### Divider
+
+Visual separator line. No props.
+
+### List
+
+Scrollable container. Same layout props as Column. Children are displayed in a scroll view.
+
+### ChoicePicker
+
+Dropdown or segmented selection.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| options | array | `[]` | Array of `{value, label}` objects |
+| dataBinding | string | | JSON Pointer for two-way binding |
+| mutuallyExclusive | DynamicBoolean | `true` | Single vs multi-select |
+
+### DateTimeInput
+
+Date and/or time picker with two-way data binding.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| enableDate | DynamicBoolean | `true` | Show date picker |
+| enableTime | DynamicBoolean | `false` | Show time picker |
+| dataBinding | string | | JSON Pointer for two-way binding |
+
+---
+
+## Visual Styling
+
+Any component can have a `style` object alongside `props`:
+
+```json
+{
+  "componentId": "btn1",
+  "type": "Button",
+  "props": {"label": "Submit"},
+  "style": {
+    "backgroundColor": "#007AFF",
+    "textColor": "#FFFFFF",
+    "cornerRadius": 8,
+    "fontSize": 16,
+    "fontWeight": "semibold"
+  }
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| backgroundColor | string | Background color as `#RRGGBB` |
+| textColor | string | Text/tint color as `#RRGGBB` |
+| cornerRadius | number | Corner radius in points |
+| width | number | Fixed width in points |
+| height | number | Fixed height in points |
+| fontSize | number | Font size in points |
+| fontWeight | string | `bold`, `semibold`, `medium`, `light` |
+| textAlign | string | `left`, `center`, `right` |
+| opacity | number | Opacity 0.0–1.0 |
+
+Surface-level styling on `createSurface`:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| backgroundColor | string | system default | Window background color as `#RRGGBB` |
+| padding | int | 20 | Root view inset in points (-1 for edge-to-edge) |
+
 ---
 
 ## Actions
 
+An action has two mutually exclusive forms: **event** (server-bound) and **functionCall** (client-bound).
+
+### Event Action
+
+Fires a named event to the transport (LLM, SSE, WebSocket). The engine resolves `dataRefs` from the data model and includes the values in the payload.
+
 ```json
 "onClick": {
   "action": {
-    "type": "serverAction",
-    "name": "submitForm",
-    "params": {"key": "value"},
-    "dataRefs": ["/name", "/email"]
+    "event": {
+      "name": "submitForm",
+      "dataRefs": ["/name", "/email"]
+    }
   }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| type | string | `"serverAction"` or `"clientAction"` |
-| name | string | Action identifier |
-| params | object | Static parameters |
-| dataRefs | string[] | Data model paths to include with the action |
+| event.name | string | Event identifier |
+| event.context | object | Static key-value pairs sent with the event |
+| event.dataRefs | string[] | Data model paths to resolve and include |
 
-When a button with `dataRefs` is clicked, the engine resolves each path from the surface's data model and includes the values in the action payload. In LLM transport mode, the action is formatted as a user message and triggers a new conversation turn, allowing the LLM to respond by updating the UI.
+In LLM transport mode, the event is formatted as a user message and triggers a new conversation turn, allowing the LLM to respond by updating the UI.
+
+### FunctionCall Action
+
+Executes a client-side function. No server round-trip.
+
+```json
+"onClick": {
+  "action": {
+    "functionCall": {
+      "call": "updateDataModel",
+      "args": {
+        "ops": [
+          {"op": "replace", "path": "/count", "value": {"functionCall": {"name": "add", "args": [{"path": "/count"}, 1]}}}
+        ]
+      }
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| functionCall.call | string | Function name to execute |
+| functionCall.args | object | Arguments passed to the function |
+
+#### Built-in Functions
+
+| Call | Args | Description |
+|------|------|-------------|
+| `updateDataModel` | `{ops: [{op, path, value}]}` | Apply JSON Patch ops to the data model. Values can be dynamic (path refs, functionCalls). |
+
+Op values are resolved through the evaluator before being applied, so they support the full expression language (path references, nested function calls).
+
+---
+
+## Expression Language
+
+Dynamic values (in props, action args, or data model op values) can use path references and function calls. The evaluator resolves these recursively at render time or action execution time.
+
+### Path Reference
+
+```json
+{"path": "/user/name"}
+```
+
+Resolves to the current value at that JSON Pointer in the data model.
+
+### Function Call
+
+```json
+{"functionCall": {"name": "concat", "args": ["Hello, ", {"path": "/name"}]}}
+```
+
+Args are resolved recursively — they can be literals, path refs, or nested function calls.
+
+### Available Functions
+
+| Function | Args | Returns | Description |
+|----------|------|---------|-------------|
+| `concat` | a, b, ... | string | Concatenate all args as strings |
+| `add` | a, b | number | a + b |
+| `subtract` | a, b | number | a - b |
+| `multiply` | a, b | number | a * b |
+| `divide` | a, b | number | a / b |
+| `equals` | a, b | bool | Strict equality |
+| `not` | a | bool | Logical negation |
+| `greaterThan` | a, b | bool | a > b |
+| `lessThan` | a, b | bool | a < b |
+| `format` | template, args... | string | `%s`/`%d`/`%f` substitution |
+| `if` | condition, trueVal, falseVal | any | Conditional (eager evaluation) |
+| `or` | a, b, ... | bool | Logical or |
+| `and` | a, b, ... | bool | Logical and |
+| `toNumber` | val | number | Parse string to number |
+| `toString` | val | string | Convert any value to string |
+| `calc` | operator, left, right | number | Evaluate `+`/`-`/`*`/`/` dynamically |
+| `contains` | str, substr | bool | String contains check |
+| `negate` | num | number | Multiply by -1 |
 
 ---
 

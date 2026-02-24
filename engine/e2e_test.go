@@ -269,3 +269,31 @@ func TestE2ELayoutFixture(t *testing.T) {
 		t.Error("no SetChildren for content Row")
 	}
 }
+
+// TestE2ECalculatorTests runs the calculator test fixture through the test runner.
+func TestE2ECalculatorTests(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+
+	results, err := RunTestFile(filepath.Join(fixtureDir(), "calculator_test.jsonl"), mock, disp)
+	if err != nil {
+		t.Fatalf("RunTestFile: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("no tests found in calculator_test.jsonl")
+	}
+
+	passed := 0
+	totalAssertions := 0
+	for _, r := range results {
+		totalAssertions += r.Assertions
+		if r.Passed {
+			passed++
+		} else {
+			t.Errorf("FAIL: %s: %s", r.Name, r.Error)
+		}
+	}
+
+	t.Logf("%d/%d tests passed, %d assertions total", passed, len(results), totalAssertions)
+}
