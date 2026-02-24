@@ -27,7 +27,8 @@ verify: build
 		echo "==> $$name"; \
 		$(BUILD_DIR)/$(BINARY) $$f & pid=$$!; \
 		sleep $(SNAP_WAIT); \
-		screencapture -x $(SNAP_DIR)/$$name.png; \
+		wid=$$(swift -e 'import Foundation; import CoreGraphics; let pid = Int32(CommandLine.arguments[1])!; guard let info = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as NSArray? else { exit(0) }; for case let w as NSDictionary in info { if let p = w["kCGWindowOwnerPID"] as? Int, p == Int(pid), let n = w["kCGWindowNumber"] as? Int, let ly = w["kCGWindowLayer"] as? Int, ly == 0 { print(n); break } }' $$pid); \
+		if [ -n "$$wid" ]; then screencapture -x -o -l $$wid $(SNAP_DIR)/$$name.png; else echo "    WARN: no window found"; fi; \
 		kill $$pid 2>/dev/null; wait $$pid 2>/dev/null; \
 		if [ -f $(SNAP_DIR)/$$name.png ]; then \
 			echo "    screenshot: $(SNAP_DIR)/$$name.png"; \
@@ -46,7 +47,8 @@ verify-fixture: build
 	echo "==> $$name"; \
 	$(BUILD_DIR)/$(BINARY) $(F) & pid=$$!; \
 	sleep $(SNAP_WAIT); \
-	screencapture -x $(SNAP_DIR)/$$name.png; \
+	wid=$$(swift -e 'import Foundation; import CoreGraphics; let pid = Int32(CommandLine.arguments[1])!; guard let info = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as NSArray? else { exit(0) }; for case let w as NSDictionary in info { if let p = w["kCGWindowOwnerPID"] as? Int, p == Int(pid), let n = w["kCGWindowNumber"] as? Int, let ly = w["kCGWindowLayer"] as? Int, ly == 0 { print(n); break } }' $$pid); \
+	if [ -n "$$wid" ]; then screencapture -x -o -l $$wid $(SNAP_DIR)/$$name.png; else echo "    WARN: no window found"; fi; \
 	kill $$pid 2>/dev/null; wait $$pid 2>/dev/null; \
 	echo "    screenshot: $(SNAP_DIR)/$$name.png"
 

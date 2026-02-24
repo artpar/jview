@@ -12,12 +12,20 @@ static NSFont* fontForVariant(NSString *variant) {
     return [NSFont systemFontOfSize:13];
 }
 
+static NSColor* colorForVariant(NSString *variant) {
+    if ([variant isEqualToString:@"caption"] || [variant isEqualToString:@"h5"]) {
+        return [NSColor secondaryLabelColor];
+    }
+    return [NSColor labelColor];
+}
+
 void* JVCreateText(const char* content, const char* variant) {
     NSString *text = [NSString stringWithUTF8String:content];
     NSString *var_ = [NSString stringWithUTF8String:variant];
 
     NSTextField *label = [NSTextField labelWithString:text];
     label.font = fontForVariant(var_);
+    label.textColor = colorForVariant(var_);
     label.lineBreakMode = NSLineBreakByWordWrapping;
     label.maximumNumberOfLines = 0; // unlimited lines
     label.translatesAutoresizingMaskIntoConstraints = NO;
@@ -28,6 +36,8 @@ void* JVCreateText(const char* content, const char* variant) {
 
 void JVUpdateText(void* handle, const char* content, const char* variant) {
     NSTextField *label = (__bridge NSTextField*)handle;
+    NSString *var_ = [NSString stringWithUTF8String:variant];
     label.stringValue = [NSString stringWithUTF8String:content];
-    label.font = fontForVariant([NSString stringWithUTF8String:variant]);
+    label.font = fontForVariant(var_);
+    label.textColor = colorForVariant(var_);
 }

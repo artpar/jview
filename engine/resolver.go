@@ -45,12 +45,18 @@ func (r *Resolver) Resolve(comp *protocol.Component) *renderer.RenderNode {
 		p.Justify = cp.Justify
 		p.Align = cp.Align
 		p.Gap = cp.Gap
+		if p.Gap == 0 {
+			p.Gap = 8
+		}
 		p.Padding = cp.Padding
 
 	case protocol.CompColumn:
 		p.Justify = cp.Justify
 		p.Align = cp.Align
 		p.Gap = cp.Gap
+		if p.Gap == 0 {
+			p.Gap = 8
+		}
 		p.Padding = cp.Padding
 
 	case protocol.CompCard:

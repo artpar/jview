@@ -21,7 +21,7 @@ func createCardView(node *renderer.RenderNode) renderer.ViewHandle {
 
 	padding := node.Props.Padding
 	if padding == 0 {
-		padding = 12
+		padding = 16
 	}
 
 	ptr := C.JVCreateCard(cTitle, cSubtitle, C.int(padding))
@@ -36,7 +36,7 @@ func updateCardView(handle renderer.ViewHandle, node *renderer.RenderNode) {
 
 	padding := node.Props.Padding
 	if padding == 0 {
-		padding = 12
+		padding = 16
 	}
 
 	C.JVUpdateCard(unsafe.Pointer(handle), cTitle, cSubtitle, C.int(padding))

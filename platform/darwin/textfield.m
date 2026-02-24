@@ -42,6 +42,7 @@ void* JVCreateTextField(const char* placeholder, const char* value,
     field.bezeled = YES;
     field.bezelStyle = NSTextFieldRoundedBezel;
     field.translatesAutoresizingMaskIntoConstraints = NO;
+    [field.widthAnchor constraintGreaterThanOrEqualToConstant:200].active = YES;
 
     // Set up delegate for change notifications
     JVTextFieldDelegate *delegate = [[JVTextFieldDelegate alloc] init];

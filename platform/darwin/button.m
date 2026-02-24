@@ -29,14 +29,14 @@ void* JVCreateButton(const char* label, const char* style, bool disabled, uint64
     if ([styleStr isEqualToString:@"primary"]) {
         button = [NSButton buttonWithTitle:labelStr target:nil action:nil];
         button.bezelStyle = NSBezelStyleRounded;
-        button.keyEquivalent = @"\r"; // Enter key
-        if (@available(macOS 10.14, *)) {
-            button.contentTintColor = [NSColor controlAccentColor];
-        }
+        button.keyEquivalent = @"\r";
+        button.bezelColor = [NSColor controlAccentColor];
     } else if ([styleStr isEqualToString:@"destructive"]) {
         button = [NSButton buttonWithTitle:labelStr target:nil action:nil];
         button.bezelStyle = NSBezelStyleRounded;
-        if (@available(macOS 10.14, *)) {
+        if (@available(macOS 12.0, *)) {
+            button.hasDestructiveAction = YES;
+        } else {
             button.contentTintColor = [NSColor systemRedColor];
         }
     } else {

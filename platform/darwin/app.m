@@ -93,13 +93,13 @@ void JVSetWindowRootView(const char* surfaceID, void* view) {
 
     [contentView addSubview:nsView];
 
-    // Pin root view: top, leading, trailing fixed; bottom with low priority so
-    // content sizes naturally from the top and fills width
-    NSLayoutConstraint *bottom = [nsView.bottomAnchor constraintLessThanOrEqualToAnchor:contentView.bottomAnchor];
+    // Pin root view with 20pt insets; bottom stays loose so content sizes from top
+    CGFloat inset = 20.0;
+    NSLayoutConstraint *bottom = [nsView.bottomAnchor constraintLessThanOrEqualToAnchor:contentView.bottomAnchor constant:-inset];
     [NSLayoutConstraint activateConstraints:@[
-        [nsView.topAnchor constraintEqualToAnchor:contentView.topAnchor],
-        [nsView.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
-        [nsView.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
+        [nsView.topAnchor constraintEqualToAnchor:contentView.topAnchor constant:inset],
+        [nsView.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:inset],
+        [nsView.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-inset],
         bottom,
     ]];
 }
