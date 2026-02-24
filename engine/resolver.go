@@ -1,19 +1,22 @@
 package engine
 
 import (
+	"encoding/json"
 	"fmt"
 	"jview/protocol"
 	"jview/renderer"
+	"log"
 )
 
 // Resolver evaluates dynamic values against a data model and tracks bindings.
 type Resolver struct {
-	dm      *DataModel
-	tracker *BindingTracker
+	dm        *DataModel
+	tracker   *BindingTracker
+	evaluator *Evaluator
 }
 
-func NewResolver(dm *DataModel, tracker *BindingTracker) *Resolver {
-	return &Resolver{dm: dm, tracker: tracker}
+func NewResolver(dm *DataModel, tracker *BindingTracker, evaluator *Evaluator) *Resolver {
+	return &Resolver{dm: dm, tracker: tracker, evaluator: evaluator}
 }
 
 // Resolve takes a protocol Component and returns a RenderNode with all
@@ -88,6 +91,56 @@ func (r *Resolver) Resolve(comp *protocol.Component) *renderer.RenderNode {
 		p.Label = r.resolveString(comp.ComponentID, cp.Label)
 		p.Checked = r.resolveBool(comp.ComponentID, cp.Checked)
 		p.DataBinding = cp.DataBinding
+
+	case protocol.CompDivider:
+		// No dynamic props
+
+	case protocol.CompIcon:
+		p.Name = r.resolveString(comp.ComponentID, cp.Name)
+		p.Size = cp.Size
+		if p.Size == 0 {
+			p.Size = 16
+		}
+
+	case protocol.CompImage:
+		p.Src = r.resolveString(comp.ComponentID, cp.Src)
+		p.Alt = r.resolveString(comp.ComponentID, cp.Alt)
+		p.Width = cp.Width
+		p.Height = cp.Height
+
+	case protocol.CompSlider:
+		p.Min = r.resolveNumber(comp.ComponentID, cp.Min)
+		p.Max = r.resolveNumber(comp.ComponentID, cp.Max)
+		if p.Max == 0 && cp.Max == nil {
+			p.Max = 100
+		}
+		p.Step = r.resolveNumber(comp.ComponentID, cp.Step)
+		if p.Step == 0 && cp.Step == nil {
+			p.Step = 1
+		}
+		p.SliderValue = r.resolveNumber(comp.ComponentID, cp.SliderValue)
+		p.DataBinding = cp.DataBinding
+
+	case protocol.CompChoicePicker:
+		p.Options = r.resolveOptions(cp.Options)
+		p.Selected = r.resolveStringList(comp.ComponentID, cp.Selected)
+		p.MutuallyExclusive = r.resolveBool(comp.ComponentID, cp.MutuallyExclusive)
+		p.DataBinding = cp.DataBinding
+
+	case protocol.CompDateTimeInput:
+		p.EnableDate = r.resolveBoolDefault(comp.ComponentID, cp.EnableDate, true)
+		p.EnableTime = r.resolveBool(comp.ComponentID, cp.EnableTime)
+		p.DateValue = r.resolveString(comp.ComponentID, cp.DateValue)
+		p.DataBinding = cp.DataBinding
+
+	case protocol.CompList:
+		p.Justify = cp.Justify
+		p.Align = cp.Align
+		p.Gap = cp.Gap
+		if p.Gap == 0 {
+			p.Gap = 8
+		}
+		p.Padding = cp.Padding
 	}
 
 	return node
@@ -96,6 +149,15 @@ func (r *Resolver) Resolve(comp *protocol.Component) *renderer.RenderNode {
 func (r *Resolver) resolveString(componentID string, dv *protocol.DynamicString) string {
 	if dv == nil {
 		return ""
+	}
+	if dv.IsFunc && dv.FunctionCall != nil {
+		r.registerFuncBindings(componentID, dv.FunctionCall.Args)
+		val, err := r.evaluator.Eval(dv.FunctionCall.Name, dv.FunctionCall.Args)
+		if err != nil {
+			log.Printf("evaluator error: %v", err)
+			return ""
+		}
+		return toString(val)
 	}
 	if dv.IsPath {
 		r.tracker.Register(dv.Path, componentID)
@@ -111,6 +173,16 @@ func (r *Resolver) resolveString(componentID string, dv *protocol.DynamicString)
 func (r *Resolver) resolveNumber(componentID string, dv *protocol.DynamicNumber) float64 {
 	if dv == nil {
 		return 0
+	}
+	if dv.IsFunc && dv.FunctionCall != nil {
+		r.registerFuncBindings(componentID, dv.FunctionCall.Args)
+		val, err := r.evaluator.Eval(dv.FunctionCall.Name, dv.FunctionCall.Args)
+		if err != nil {
+			log.Printf("evaluator error: %v", err)
+			return 0
+		}
+		f, _ := toFloat(val)
+		return f
 	}
 	if dv.IsPath {
 		r.tracker.Register(dv.Path, componentID)
@@ -130,6 +202,16 @@ func (r *Resolver) resolveBool(componentID string, dv *protocol.DynamicBoolean) 
 	if dv == nil {
 		return false
 	}
+	if dv.IsFunc && dv.FunctionCall != nil {
+		r.registerFuncBindings(componentID, dv.FunctionCall.Args)
+		val, err := r.evaluator.Eval(dv.FunctionCall.Name, dv.FunctionCall.Args)
+		if err != nil {
+			log.Printf("evaluator error: %v", err)
+			return false
+		}
+		b, _ := toBool(val)
+		return b
+	}
 	if dv.IsPath {
 		r.tracker.Register(dv.Path, componentID)
 		val, ok := r.dm.Get(dv.Path)
@@ -142,4 +224,63 @@ func (r *Resolver) resolveBool(componentID string, dv *protocol.DynamicBoolean) 
 		return false
 	}
 	return dv.Literal
+}
+
+func (r *Resolver) resolveBoolDefault(componentID string, dv *protocol.DynamicBoolean, defaultVal bool) bool {
+	if dv == nil {
+		return defaultVal
+	}
+	return r.resolveBool(componentID, dv)
+}
+
+func (r *Resolver) resolveStringList(componentID string, dv *protocol.DynamicStringList) []string {
+	if dv == nil {
+		return nil
+	}
+	if dv.IsPath {
+		r.tracker.Register(dv.Path, componentID)
+		val, ok := r.dm.Get(dv.Path)
+		if !ok {
+			return nil
+		}
+		if arr, ok := val.([]interface{}); ok {
+			result := make([]string, len(arr))
+			for i, item := range arr {
+				result[i] = fmt.Sprintf("%v", item)
+			}
+			return result
+		}
+		if arr, ok := val.([]string); ok {
+			return arr
+		}
+		return nil
+	}
+	return dv.Literal
+}
+
+func (r *Resolver) resolveOptions(raw []byte) []renderer.OptionItem {
+	if len(raw) == 0 {
+		return nil
+	}
+	var items []renderer.OptionItem
+	// Try parsing as array of {label, value} objects
+	type rawOption struct {
+		Label string `json:"label"`
+		Value string `json:"value"`
+	}
+	var opts []rawOption
+	if err := json.Unmarshal(raw, &opts); err != nil {
+		return nil
+	}
+	for _, o := range opts {
+		items = append(items, renderer.OptionItem{Label: o.Label, Value: o.Value})
+	}
+	return items
+}
+
+// registerFuncBindings walks function call args and registers bindings for any path references.
+func (r *Resolver) registerFuncBindings(componentID string, args []interface{}) {
+	for _, path := range PathsInArgs(args) {
+		r.tracker.Register(path, componentID)
+	}
 }

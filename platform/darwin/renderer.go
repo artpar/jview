@@ -73,6 +73,20 @@ func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode)
 		handle = createTextFieldView(node, surfaceID)
 	case protocol.CompCheckBox:
 		handle = createCheckBoxView(node, surfaceID)
+	case protocol.CompDivider:
+		handle = createDividerView(node)
+	case protocol.CompIcon:
+		handle = createIconView(node)
+	case protocol.CompImage:
+		handle = createImageView(node)
+	case protocol.CompSlider:
+		handle = createSliderView(node, surfaceID)
+	case protocol.CompChoicePicker:
+		handle = createChoicePickerView(node, surfaceID)
+	case protocol.CompDateTimeInput:
+		handle = createDateTimeInputView(node, surfaceID)
+	case protocol.CompList:
+		handle = createListView(node)
 	default:
 		log.Printf("darwin: unsupported component type %s", node.Type)
 		return 0
@@ -105,6 +119,20 @@ func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle
 		updateTextFieldView(handle, node)
 	case protocol.CompCheckBox:
 		updateCheckBoxView(handle, node)
+	case protocol.CompDivider:
+		updateDividerView(handle, node)
+	case protocol.CompIcon:
+		updateIconView(handle, node)
+	case protocol.CompImage:
+		updateImageView(handle, node)
+	case protocol.CompSlider:
+		updateSliderView(handle, node)
+	case protocol.CompChoicePicker:
+		updateChoicePickerView(handle, node)
+	case protocol.CompDateTimeInput:
+		updateDateTimeInputView(handle, node)
+	case protocol.CompList:
+		updateListView(handle, node)
 	default:
 		log.Printf("darwin: unsupported update for component type %s", node.Type)
 	}
@@ -118,6 +146,8 @@ func (r *DarwinRenderer) SetChildren(surfaceID string, parentHandle renderer.Vie
 		setStackViewChildren(parentHandle, childHandles)
 	case protocol.CompCard:
 		setCardChildren(parentHandle, childHandles)
+	case protocol.CompList:
+		setListChildren(parentHandle, childHandles)
 	default:
 		log.Printf("darwin: SetChildren not supported for type %s", parentType)
 	}

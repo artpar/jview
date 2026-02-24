@@ -1,0 +1,2 @@
+{"type":"createSurface","surfaceId":"divider","title":"Divider Demo","width":400,"height":300}
+{"type":"updateComponents","surfaceId":"divider","components":[{"componentId":"root","type":"Column","props":{"gap":8,"padding":16},"children":["top","sep","bottom"]},{"componentId":"top","type":"Text","props":{"content":"Above the divider","variant":"body"}},{"componentId":"sep","type":"Divider"},{"componentId":"bottom","type":"Text","props":{"content":"Below the divider","variant":"body"}}]}

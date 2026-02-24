@@ -43,11 +43,12 @@ type ResolvedProps struct {
 	Disabled bool
 
 	// TextField
-	Placeholder string
-	Value       string
-	InputType   string
-	ReadOnly    bool
-	DataBinding string
+	Placeholder      string
+	Value            string
+	InputType        string
+	ReadOnly         bool
+	DataBinding      string
+	ValidationErrors []string
 
 	// CheckBox
 	Checked bool
@@ -67,15 +68,31 @@ type ResolvedProps struct {
 	// Icon
 	Name string
 	Size int
+
+	// ChoicePicker
+	Options           []OptionItem
+	Selected          []string
+	MutuallyExclusive bool
+
+	// DateTimeInput
+	EnableDate bool
+	EnableTime bool
+	DateValue  string
+}
+
+// OptionItem represents a single option in a ChoicePicker.
+type OptionItem struct {
+	Label string
+	Value string
 }
 
 // RenderOp is a single rendering operation to be dispatched to the main thread.
 type RenderOp struct {
-	Kind        RenderOpKind
-	Node        *RenderNode
-	Handle      ViewHandle
-	ParentID    string
-	CallbackID  CallbackID
+	Kind       RenderOpKind
+	Node       *RenderNode
+	Handle     ViewHandle
+	ParentID   string
+	CallbackID CallbackID
 }
 
 type RenderOpKind int

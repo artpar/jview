@@ -406,6 +406,175 @@ func TestContactFormFixtureFull(t *testing.T) {
 	}
 }
 
+func TestSliderBindingPropagates(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/vol","value":50}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"sl","type":"Slider","props":{"min":0,"max":100,"step":1,"sliderValue":{"path":"/vol"},"dataBinding":"/vol"}},{"componentId":"display","type":"Text","props":{"content":{"path":"/vol"}}}]}`)
+
+	initialUpdates := len(mock.Updated)
+	mock.InvokeCallback("s1", "sl", "slide", "75")
+
+	foundDisplay := false
+	for _, u := range mock.Updated[initialUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "display" {
+			foundDisplay = true
+			if u.Node.Props.Content != "75" {
+				t.Errorf("display content = %q, want '75'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !foundDisplay {
+		t.Error("slider binding did not propagate to display")
+	}
+}
+
+func TestChoicePickerBindingPropagates(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/color","value":"red"}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"pick","type":"ChoicePicker","props":{"options":[{"label":"Red","value":"red"},{"label":"Blue","value":"blue"}],"selected":["red"],"dataBinding":"/color"}},{"componentId":"display","type":"Text","props":{"content":{"path":"/color"}}}]}`)
+
+	initialUpdates := len(mock.Updated)
+	mock.InvokeCallback("s1", "pick", "select", "blue")
+
+	foundDisplay := false
+	for _, u := range mock.Updated[initialUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "display" {
+			foundDisplay = true
+			if u.Node.Props.Content != "blue" {
+				t.Errorf("display content = %q, want 'blue'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !foundDisplay {
+		t.Error("choice picker binding did not propagate to display")
+	}
+}
+
+func TestTextFieldValidation(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/name","value":""}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"field","type":"TextField","props":{"placeholder":"Name","value":{"path":"/name"},"dataBinding":"/name","validations":[{"type":"required"},{"type":"minLength","value":3}]}}]}`)
+
+	// Type a single character — should fail both required (it's non-empty) and minLength
+	beforeUpdates := len(mock.Updated)
+	mock.InvokeCallback("s1", "field", "change", "ab")
+
+	// The field should be re-rendered with validation errors
+	foundField := false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "field" {
+			foundField = true
+			if len(u.Node.Props.ValidationErrors) != 1 {
+				t.Errorf("validation errors = %d, want 1 (minLength)", len(u.Node.Props.ValidationErrors))
+			}
+		}
+	}
+	if !foundField {
+		t.Error("field not re-rendered after change")
+	}
+
+	// Type valid input — should clear errors
+	beforeUpdates = len(mock.Updated)
+	mock.InvokeCallback("s1", "field", "change", "Alice")
+
+	foundClear := false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "field" {
+			foundClear = true
+			if len(u.Node.Props.ValidationErrors) != 0 {
+				t.Errorf("validation errors after valid = %v, want empty", u.Node.Props.ValidationErrors)
+			}
+		}
+	}
+	if !foundClear {
+		t.Error("field not re-rendered after valid input")
+	}
+}
+
+func TestTemplateExpansion(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/items","value":[{"name":"Alice"},{"name":"Bob"}]}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"list","type":"List","props":{"gap":8},"children":{"forEach":"/items","templateId":"tmpl","itemVariable":"item"}},{"componentId":"tmpl","type":"Text","props":{"content":{"path":"/item/name"}}}]}`)
+
+	// Template should be expanded: tmpl_0, tmpl_1 created, tmpl itself should not exist
+	created := map[string]string{}
+	for _, c := range mock.Created {
+		created[c.Node.ComponentID] = c.Node.Props.Content
+	}
+
+	if _, ok := created["tmpl"]; ok {
+		t.Error("template source component 'tmpl' should not be created")
+	}
+	if created["tmpl_0"] != "Alice" {
+		t.Errorf("tmpl_0 content = %q, want 'Alice'", created["tmpl_0"])
+	}
+	if created["tmpl_1"] != "Bob" {
+		t.Errorf("tmpl_1 content = %q, want 'Bob'", created["tmpl_1"])
+	}
+
+	// List should have 2 children
+	listHandle := mock.GetHandle("s1", "list")
+	if listHandle == 0 {
+		t.Fatal("list not created")
+	}
+	foundListChildren := false
+	for _, cs := range mock.Children {
+		if cs.ParentHandle == listHandle {
+			foundListChildren = true
+			if len(cs.ChildHandles) != 2 {
+				t.Errorf("list children = %d, want 2", len(cs.ChildHandles))
+			}
+		}
+	}
+	if !foundListChildren {
+		t.Error("no SetChildren for list")
+	}
+}
+
+func TestTemplateExpansionNested(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/items","value":[{"name":"Alice","role":"Engineer"},{"name":"Bob","role":"Designer"}]}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"list","type":"List","props":{"gap":8},"children":{"forEach":"/items","templateId":"card","itemVariable":"item"}},{"componentId":"card","type":"Card","props":{"title":{"path":"/item/name"}},"children":["cardRole"]},{"componentId":"cardRole","type":"Text","props":{"content":{"path":"/item/role"},"variant":"caption"}}]}`)
+
+	// Check that nested children are also expanded
+	created := map[string]string{}
+	for _, c := range mock.Created {
+		created[c.Node.ComponentID] = c.Node.Props.Content
+	}
+
+	// card_0 and card_1 should exist
+	cardCreated := false
+	for _, c := range mock.Created {
+		if c.Node.ComponentID == "card_0" {
+			cardCreated = true
+			if c.Node.Props.Title != "Alice" {
+				t.Errorf("card_0 title = %q, want Alice", c.Node.Props.Title)
+			}
+		}
+	}
+	if !cardCreated {
+		t.Error("card_0 not created")
+	}
+
+	// cardRole_0 and cardRole_1 should exist
+	if created["cardRole_0"] != "Engineer" {
+		t.Errorf("cardRole_0 content = %q, want 'Engineer'", created["cardRole_0"])
+	}
+	if created["cardRole_1"] != "Designer" {
+		t.Errorf("cardRole_1 content = %q, want 'Designer'", created["cardRole_1"])
+	}
+}
+
 func TestSessionUnknownSurface(t *testing.T) {
 	sess, mock := newTestSession()
 

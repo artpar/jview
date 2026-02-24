@@ -1,13 +1,26 @@
 package engine
 
 import (
+	"jview/protocol"
 	"jview/renderer"
 	"jview/transport"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
+
+// parseMessage parses a single JSONL line into a Message.
+func parseMessage(t *testing.T, jsonl string) *protocol.Message {
+	t.Helper()
+	p := protocol.NewParser(strings.NewReader(jsonl))
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return msg
+}
 
 func fixtureDir() string {
 	_, file, _, _ := runtime.Caller(0)
@@ -104,6 +117,113 @@ func TestE2EContactFormFixture(t *testing.T) {
 	}
 	if !foundUpdate {
 		t.Error("name binding did not propagate to previewName")
+	}
+}
+
+// TestE2EFunctionCallsFixture validates function call evaluation.
+func TestE2EFunctionCallsFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "function_calls.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout")
+	}
+
+	created := map[string]string{}
+	for _, c := range mock.Created {
+		created[c.Node.ComponentID] = c.Node.Props.Content
+	}
+
+	// greeting: concat("Hello, ", {path:"/name"}, "!") → "Hello, world!"
+	if created["greeting"] != "Hello, world!" {
+		t.Errorf("greeting = %q, want 'Hello, world!'", created["greeting"])
+	}
+
+	// upper: toUpperCase({path:"/name"}) → "WORLD"
+	if created["upper"] != "WORLD" {
+		t.Errorf("upper = %q, want 'WORLD'", created["upper"])
+	}
+
+	// computed: format("Name: {0}, Length: {1}", /name, length(/name)) → "Name: world, Length: 5"
+	if created["computed"] != "Name: world, Length: 5" {
+		t.Errorf("computed = %q, want 'Name: world, Length: 5'", created["computed"])
+	}
+
+	// Verify data binding: updating /name should re-render function call components
+	before := len(mock.Updated)
+	sess.HandleMessage(parseMessage(t, `{"type":"updateDataModel","surfaceId":"funcs","ops":[{"op":"replace","path":"/name","value":"test"}]}`))
+
+	foundGreeting := false
+	for _, u := range mock.Updated[before:] {
+		if u.Node != nil && u.Node.ComponentID == "greeting" {
+			foundGreeting = true
+			if u.Node.Props.Content != "Hello, test!" {
+				t.Errorf("greeting after update = %q, want 'Hello, test!'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !foundGreeting {
+		t.Error("function call component not re-rendered after data model update")
+	}
+}
+
+// TestE2EListFixture validates template expansion and List component.
+func TestE2EListFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "list.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout")
+	}
+
+	// Check expanded components exist
+	created := map[string]string{}
+	createdTitles := map[string]string{}
+	for _, c := range mock.Created {
+		created[c.Node.ComponentID] = c.Node.Props.Content
+		createdTitles[c.Node.ComponentID] = c.Node.Props.Title
+	}
+
+	// 3 items in data model → 3 card+role pairs
+	if createdTitles["itemCard_0"] != "Alice" {
+		t.Errorf("itemCard_0 title = %q, want Alice", createdTitles["itemCard_0"])
+	}
+	if createdTitles["itemCard_1"] != "Bob" {
+		t.Errorf("itemCard_1 title = %q, want Bob", createdTitles["itemCard_1"])
+	}
+	if createdTitles["itemCard_2"] != "Charlie" {
+		t.Errorf("itemCard_2 title = %q, want Charlie", createdTitles["itemCard_2"])
+	}
+	if created["itemRole_0"] != "Engineer" {
+		t.Errorf("itemRole_0 = %q, want Engineer", created["itemRole_0"])
 	}
 }
 

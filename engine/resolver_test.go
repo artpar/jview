@@ -8,7 +8,8 @@ import (
 func newTestResolver() (*Resolver, *DataModel, *BindingTracker) {
 	dm := NewDataModel()
 	tracker := NewBindingTracker()
-	return NewResolver(dm, tracker), dm, tracker
+	evaluator := NewEvaluator(dm)
+	return NewResolver(dm, tracker, evaluator), dm, tracker
 }
 
 func TestResolveTextLiteral(t *testing.T) {

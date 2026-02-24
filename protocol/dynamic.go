@@ -42,9 +42,11 @@ func (d *DynamicString) UnmarshalJSON(data []byte) error {
 }
 
 type DynamicNumber struct {
-	Literal float64
-	Path    string
-	IsPath  bool
+	Literal      float64
+	Path         string
+	FunctionCall *FunctionCall
+	IsPath       bool
+	IsFunc       bool
 }
 
 func (d *DynamicNumber) UnmarshalJSON(data []byte) error {
@@ -55,7 +57,8 @@ func (d *DynamicNumber) UnmarshalJSON(data []byte) error {
 	}
 
 	var obj struct {
-		Path string `json:"path"`
+		Path         string        `json:"path"`
+		FunctionCall *FunctionCall `json:"functionCall"`
 	}
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
@@ -64,13 +67,19 @@ func (d *DynamicNumber) UnmarshalJSON(data []byte) error {
 		d.Path = obj.Path
 		d.IsPath = true
 	}
+	if obj.FunctionCall != nil {
+		d.FunctionCall = obj.FunctionCall
+		d.IsFunc = true
+	}
 	return nil
 }
 
 type DynamicBoolean struct {
-	Literal bool
-	Path    string
-	IsPath  bool
+	Literal      bool
+	Path         string
+	FunctionCall *FunctionCall
+	IsPath       bool
+	IsFunc       bool
 }
 
 func (d *DynamicBoolean) UnmarshalJSON(data []byte) error {
@@ -81,7 +90,8 @@ func (d *DynamicBoolean) UnmarshalJSON(data []byte) error {
 	}
 
 	var obj struct {
-		Path string `json:"path"`
+		Path         string        `json:"path"`
+		FunctionCall *FunctionCall `json:"functionCall"`
 	}
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
@@ -89,6 +99,10 @@ func (d *DynamicBoolean) UnmarshalJSON(data []byte) error {
 	if obj.Path != "" {
 		d.Path = obj.Path
 		d.IsPath = true
+	}
+	if obj.FunctionCall != nil {
+		d.FunctionCall = obj.FunctionCall
+		d.IsFunc = true
 	}
 	return nil
 }

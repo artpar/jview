@@ -47,6 +47,10 @@ void* JVCreateCard(const char* title, const char* subtitle, int padding) {
     // Associate the content stack for later child management
     objc_setAssociatedObject(box, kContentStackKey, contentStack, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
+    // Lower content-hugging so the box expands to fill parent width
+    [box setContentHuggingPriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+    [box setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+
     return (__bridge_retained void*)box;
 }
 

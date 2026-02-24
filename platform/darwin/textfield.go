@@ -39,4 +39,24 @@ func updateTextFieldView(handle renderer.ViewHandle, node *renderer.RenderNode) 
 	defer C.free(unsafe.Pointer(cInputType))
 
 	C.JVUpdateTextField(unsafe.Pointer(handle), cPlaceholder, cValue, cInputType, C.bool(node.Props.ReadOnly))
+
+	// Update validation errors
+	setTextFieldErrors(handle, node.Props.ValidationErrors)
+}
+
+func setTextFieldErrors(handle renderer.ViewHandle, errors []string) {
+	n := len(errors)
+	if n == 0 {
+		C.JVSetTextFieldErrors(unsafe.Pointer(handle), nil, 0)
+		return
+	}
+
+	cErrors := make([]*C.char, n)
+	for i, e := range errors {
+		cErrors[i] = C.CString(e)
+	}
+	C.JVSetTextFieldErrors(unsafe.Pointer(handle), &cErrors[0], C.int(n))
+	for _, ce := range cErrors {
+		C.free(unsafe.Pointer(ce))
+	}
 }

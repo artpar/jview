@@ -1,11 +1,8 @@
 #import <Cocoa/Cocoa.h>
 #include "stackview.h"
+#import <objc/runtime.h>
 
-static NSStackViewGravity gravityForJustify(NSString *justify, bool horizontal) {
-    // For now, gravity affects placement in the stack
-    // NSStackView uses distribution rather than individual gravity per-item
-    return NSStackViewGravityCenter;
-}
+static const void *kStretchModeKey = &kStretchModeKey;
 
 static NSLayoutAttribute alignmentForAlign(NSString *align, bool horizontal) {
     if ([align isEqualToString:@"start"]) {
@@ -14,10 +11,7 @@ static NSLayoutAttribute alignmentForAlign(NSString *align, bool horizontal) {
     if ([align isEqualToString:@"end"]) {
         return horizontal ? NSLayoutAttributeBottom : NSLayoutAttributeTrailing;
     }
-    if ([align isEqualToString:@"stretch"]) {
-        return horizontal ? NSLayoutAttributeTop : NSLayoutAttributeLeading;
-    }
-    // center (default)
+    // center (default), stretch handled separately
     return horizontal ? NSLayoutAttributeCenterY : NSLayoutAttributeCenterX;
 }
 
@@ -33,6 +27,17 @@ static void applyDistribution(NSStackView *stack, NSString *justify) {
     }
 }
 
+static void applyAlignment(NSStackView *stack, NSString *alignStr, bool horizontal) {
+    if ([alignStr isEqualToString:@"stretch"]) {
+        // Use leading alignment and pin children in SetChildren
+        stack.alignment = horizontal ? NSLayoutAttributeTop : NSLayoutAttributeLeading;
+        objc_setAssociatedObject(stack, kStretchModeKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else {
+        stack.alignment = alignmentForAlign(alignStr, horizontal);
+        objc_setAssociatedObject(stack, kStretchModeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
 void* JVCreateStackView(bool horizontal, const char* justify, const char* align, int gap, int padding) {
     NSStackView *stack = [[NSStackView alloc] init];
     stack.orientation = horizontal ? NSUserInterfaceLayoutOrientationHorizontal
@@ -45,13 +50,7 @@ void* JVCreateStackView(bool horizontal, const char* justify, const char* align,
     NSString *alignStr = [NSString stringWithUTF8String:align];
 
     applyDistribution(stack, justifyStr);
-
-    if ([alignStr isEqualToString:@"stretch"]) {
-        // For stretch alignment in vertical stacks, arranged subviews should fill width
-        stack.alignment = horizontal ? NSLayoutAttributeTop : NSLayoutAttributeWidth;
-    } else {
-        stack.alignment = alignmentForAlign(alignStr, horizontal);
-    }
+    applyAlignment(stack, alignStr, horizontal);
 
     return (__bridge_retained void*)stack;
 }
@@ -65,17 +64,14 @@ void JVUpdateStackView(void* handle, const char* justify, const char* align, int
     NSString *alignStr = [NSString stringWithUTF8String:align];
 
     applyDistribution(stack, justifyStr);
-
     bool horizontal = (stack.orientation == NSUserInterfaceLayoutOrientationHorizontal);
-    if ([alignStr isEqualToString:@"stretch"]) {
-        stack.alignment = horizontal ? NSLayoutAttributeTop : NSLayoutAttributeWidth;
-    } else {
-        stack.alignment = alignmentForAlign(alignStr, horizontal);
-    }
+    applyAlignment(stack, alignStr, horizontal);
 }
 
 void JVStackViewSetChildren(void* handle, void** children, int count) {
     NSStackView *stack = (__bridge NSStackView*)handle;
+    BOOL stretch = [objc_getAssociatedObject(stack, kStretchModeKey) boolValue];
+    bool vertical = (stack.orientation == NSUserInterfaceLayoutOrientationVertical);
 
     // Remove all existing arranged subviews
     NSArray<NSView*> *existing = [stack.arrangedSubviews copy];
@@ -87,6 +83,18 @@ void JVStackViewSetChildren(void* handle, void** children, int count) {
     // Add new children
     for (int i = 0; i < count; i++) {
         NSView *child = (__bridge NSView*)children[i];
+        child.translatesAutoresizingMaskIntoConstraints = NO;
         [stack addArrangedSubview:child];
+
+        // In stretch mode, pin children to fill the cross-axis
+        if (stretch) {
+            if (vertical) {
+                [child.leadingAnchor constraintEqualToAnchor:stack.leadingAnchor constant:stack.edgeInsets.left].active = YES;
+                [child.trailingAnchor constraintEqualToAnchor:stack.trailingAnchor constant:-stack.edgeInsets.right].active = YES;
+            } else {
+                [child.topAnchor constraintEqualToAnchor:stack.topAnchor constant:stack.edgeInsets.top].active = YES;
+                [child.bottomAnchor constraintEqualToAnchor:stack.bottomAnchor constant:-stack.edgeInsets.bottom].active = YES;
+            }
+        }
     }
 }

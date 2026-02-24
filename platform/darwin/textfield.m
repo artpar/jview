@@ -6,6 +6,8 @@ extern void GoCallbackInvoke(uint64_t callbackID, const char* data);
 
 static const void *kTextFieldCallbackKey = &kTextFieldCallbackKey;
 static const void *kTextFieldDelegateKey = &kTextFieldDelegateKey;
+static const void *kTextFieldErrorStackKey = &kTextFieldErrorStackKey;
+static const void *kTextFieldInnerFieldKey = &kTextFieldInnerFieldKey;
 
 @interface JVTextFieldDelegate : NSObject <NSTextFieldDelegate>
 @property (nonatomic, assign) uint64_t callbackID;
@@ -52,13 +54,71 @@ void* JVCreateTextField(const char* placeholder, const char* value,
     // Prevent delegate from being deallocated
     objc_setAssociatedObject(field, kTextFieldDelegateKey, delegate, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-    return (__bridge_retained void*)field;
+    // Wrap in a stack view to support error labels
+    NSStackView *wrapper = [[NSStackView alloc] init];
+    wrapper.orientation = NSUserInterfaceLayoutOrientationVertical;
+    wrapper.spacing = 4;
+    wrapper.translatesAutoresizingMaskIntoConstraints = NO;
+    wrapper.alignment = NSLayoutAttributeLeading;
+
+    [wrapper addArrangedSubview:field];
+
+    // Store references
+    objc_setAssociatedObject(wrapper, kTextFieldInnerFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    return (__bridge_retained void*)wrapper;
 }
 
 void JVUpdateTextField(void* handle, const char* placeholder, const char* value,
                         const char* inputType, bool readOnly) {
-    NSTextField *field = (__bridge NSTextField*)handle;
+    NSStackView *wrapper = (__bridge NSStackView*)handle;
+    NSTextField *field = objc_getAssociatedObject(wrapper, kTextFieldInnerFieldKey);
+    if (!field) return;
+
     field.placeholderString = [NSString stringWithUTF8String:placeholder];
     field.stringValue = [NSString stringWithUTF8String:value];
     field.editable = !readOnly;
+}
+
+void JVSetTextFieldErrors(void* handle, const char** errors, int count) {
+    NSStackView *wrapper = (__bridge NSStackView*)handle;
+    NSTextField *field = objc_getAssociatedObject(wrapper, kTextFieldInnerFieldKey);
+    if (!field) return;
+
+    // Remove old error labels (everything after the text field)
+    NSMutableArray<NSView*> *errorLabels = objc_getAssociatedObject(wrapper, kTextFieldErrorStackKey);
+    if (errorLabels) {
+        for (NSView *label in errorLabels) {
+            [wrapper removeArrangedSubview:label];
+            [label removeFromSuperview];
+        }
+    }
+
+    NSMutableArray<NSView*> *newLabels = [NSMutableArray array];
+
+    if (count > 0) {
+        // Red border on the field
+        field.wantsLayer = YES;
+        field.layer.borderColor = [NSColor systemRedColor].CGColor;
+        field.layer.borderWidth = 1.0;
+        field.layer.cornerRadius = 4.0;
+
+        for (int i = 0; i < count; i++) {
+            NSString *errStr = [NSString stringWithUTF8String:errors[i]];
+            NSTextField *errorLabel = [NSTextField labelWithString:errStr];
+            errorLabel.font = [NSFont systemFontOfSize:11];
+            errorLabel.textColor = [NSColor systemRedColor];
+            errorLabel.lineBreakMode = NSLineBreakByWordWrapping;
+            errorLabel.maximumNumberOfLines = 0;
+            [wrapper addArrangedSubview:errorLabel];
+            [newLabels addObject:errorLabel];
+        }
+    } else {
+        // Clear border
+        field.wantsLayer = YES;
+        field.layer.borderColor = nil;
+        field.layer.borderWidth = 0;
+    }
+
+    objc_setAssociatedObject(wrapper, kTextFieldErrorStackKey, newLabels, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }

@@ -9,16 +9,20 @@ import (
 
 // Surface manages a single A2UI surface: its component tree, data model, and bindings.
 type Surface struct {
-	id       string
-	tree     *Tree
-	dm       *DataModel
-	tracker  *BindingTracker
-	resolver *Resolver
-	rend     renderer.Renderer
-	dispatch renderer.Dispatcher
+	id        string
+	tree      *Tree
+	dm        *DataModel
+	tracker   *BindingTracker
+	resolver  *Resolver
+	validator *Validator
+	rend      renderer.Renderer
+	dispatch  renderer.Dispatcher
 
 	// activeCallbacks tracks registered callbacks: componentID → eventType → CallbackID
 	activeCallbacks map[string]map[string]renderer.CallbackID
+
+	// validationErrors tracks current validation errors: componentID → []errorMessages
+	validationErrors map[string][]string
 
 	// ActionHandler is called when a component triggers a server action.
 	ActionHandler func(surfaceID string, action *protocol.Action, eventData map[string]interface{})
@@ -27,21 +31,25 @@ type Surface struct {
 func NewSurface(id string, rend renderer.Renderer, dispatch renderer.Dispatcher) *Surface {
 	dm := NewDataModel()
 	tracker := NewBindingTracker()
+	evaluator := NewEvaluator(dm)
 	return &Surface{
-		id:              id,
-		tree:            NewTree(),
-		dm:              dm,
-		tracker:         tracker,
-		resolver:        NewResolver(dm, tracker),
-		rend:            rend,
-		dispatch:        dispatch,
-		activeCallbacks: make(map[string]map[string]renderer.CallbackID),
+		id:               id,
+		tree:             NewTree(),
+		dm:               dm,
+		tracker:          tracker,
+		resolver:         NewResolver(dm, tracker, evaluator),
+		validator:        NewValidator(),
+		rend:             rend,
+		dispatch:         dispatch,
+		activeCallbacks:  make(map[string]map[string]renderer.CallbackID),
+		validationErrors: make(map[string][]string),
 	}
 }
 
 // HandleUpdateComponents processes a batch of component definitions.
 func (s *Surface) HandleUpdateComponents(msg protocol.UpdateComponents) {
-	changed := s.tree.Update(msg.Components)
+	expanded := s.expandTemplates(msg.Components)
+	changed := s.tree.Update(expanded)
 	s.renderComponents(changed)
 }
 
@@ -93,6 +101,10 @@ func (s *Surface) renderComponents(componentIDs []string) {
 			continue
 		}
 		node := s.resolver.Resolve(comp)
+		// Attach validation errors if any
+		if errs, ok := s.validationErrors[id]; ok {
+			node.Props.ValidationErrors = errs
+		}
 		s.registerCallbacks(comp, node)
 		nodeMap[id] = &renderWork{node: node, comp: comp}
 	}
@@ -216,22 +228,26 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 		if comp.Props.DataBinding != "" {
 			binding := comp.Props.DataBinding
 			compID := comp.ComponentID
+			validations := comp.Props.Validations
 			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "change", func(value string) {
 				changed, err := s.dm.Set(binding, value)
 				if err != nil {
 					log.Printf("surface %s: binding set error: %v", s.id, err)
 					return
 				}
+				// Run validation
+				errors := s.validator.Validate(value, validations)
+				s.validationErrors[compID] = errors
+
 				affected := s.tracker.Affected(changed)
-				var toRender []string
+				// Re-render the field itself (for validation display) plus affected
+				toRender := []string{compID}
 				for _, id := range affected {
 					if id != compID {
 						toRender = append(toRender, id)
 					}
 				}
-				if len(toRender) > 0 {
-					s.renderComponents(toRender)
-				}
+				s.renderComponents(toRender)
 			})
 			node.Callbacks["change"] = cbID
 			s.trackCallback(comp.ComponentID, "change", cbID)
@@ -262,6 +278,83 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 			node.Callbacks["toggle"] = cbID
 			s.trackCallback(comp.ComponentID, "toggle", cbID)
 		}
+
+	case protocol.CompSlider:
+		if comp.Props.DataBinding != "" {
+			binding := comp.Props.DataBinding
+			compID := comp.ComponentID
+			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "slide", func(value string) {
+				var fVal float64
+				fmt.Sscanf(value, "%f", &fVal)
+				changed, err := s.dm.Set(binding, fVal)
+				if err != nil {
+					log.Printf("surface %s: slider binding error: %v", s.id, err)
+					return
+				}
+				affected := s.tracker.Affected(changed)
+				var toRender []string
+				for _, id := range affected {
+					if id != compID {
+						toRender = append(toRender, id)
+					}
+				}
+				if len(toRender) > 0 {
+					s.renderComponents(toRender)
+				}
+			})
+			node.Callbacks["slide"] = cbID
+			s.trackCallback(comp.ComponentID, "slide", cbID)
+		}
+
+	case protocol.CompChoicePicker:
+		if comp.Props.DataBinding != "" {
+			binding := comp.Props.DataBinding
+			compID := comp.ComponentID
+			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "select", func(value string) {
+				changed, err := s.dm.Set(binding, value)
+				if err != nil {
+					log.Printf("surface %s: picker binding error: %v", s.id, err)
+					return
+				}
+				affected := s.tracker.Affected(changed)
+				var toRender []string
+				for _, id := range affected {
+					if id != compID {
+						toRender = append(toRender, id)
+					}
+				}
+				if len(toRender) > 0 {
+					s.renderComponents(toRender)
+				}
+			})
+			node.Callbacks["select"] = cbID
+			s.trackCallback(comp.ComponentID, "select", cbID)
+		}
+
+	case protocol.CompDateTimeInput:
+		if comp.Props.DataBinding != "" {
+			binding := comp.Props.DataBinding
+			compID := comp.ComponentID
+			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "datechange", func(value string) {
+				changed, err := s.dm.Set(binding, value)
+				if err != nil {
+					log.Printf("surface %s: date binding error: %v", s.id, err)
+					return
+				}
+				affected := s.tracker.Affected(changed)
+				var toRender []string
+				for _, id := range affected {
+					if id != compID {
+						toRender = append(toRender, id)
+					}
+				}
+				if len(toRender) > 0 {
+					s.renderComponents(toRender)
+				}
+			})
+			node.Callbacks["datechange"] = cbID
+			s.trackCallback(comp.ComponentID, "datechange", cbID)
+		}
 	}
 }
 
@@ -270,4 +363,322 @@ func (s *Surface) trackCallback(componentID, eventType string, cbID renderer.Cal
 		s.activeCallbacks[componentID] = make(map[string]renderer.CallbackID)
 	}
 	s.activeCallbacks[componentID][eventType] = cbID
+}
+
+// expandTemplates processes components with template children, expanding them
+// into static children based on data model arrays.
+func (s *Surface) expandTemplates(comps []protocol.Component) []protocol.Component {
+	// Index components in this batch by ID for template lookup
+	compMap := make(map[string]*protocol.Component, len(comps))
+	for i := range comps {
+		compMap[comps[i].ComponentID] = &comps[i]
+	}
+
+	var result []protocol.Component
+	usedAsTemplate := make(map[string]bool)
+
+	for i := range comps {
+		comp := comps[i]
+		if comp.Children == nil || comp.Children.Template == nil {
+			result = append(result, comp)
+			continue
+		}
+
+		tmpl := comp.Children.Template
+
+		// Collect the full template subtree (template root + descendants)
+		templateTree := s.collectTemplateTree(tmpl.TemplateID, compMap)
+		if len(templateTree) == 0 {
+			result = append(result, comp)
+			continue
+		}
+		for _, tc := range templateTree {
+			usedAsTemplate[tc.ComponentID] = true
+		}
+
+		// Look up the forEach array in the data model
+		val, found := s.dm.Get(tmpl.ForEach)
+		if !found {
+			result = append(result, comp)
+			continue
+		}
+		items, ok := val.([]interface{})
+		if !ok {
+			result = append(result, comp)
+			continue
+		}
+
+		// Register binding on the forEach path to this parent component
+		s.tracker.Register(tmpl.ForEach, comp.ComponentID)
+
+		// Generate children
+		var childIDs []string
+		for idx := range items {
+			itemPath := fmt.Sprintf("%s/%d", tmpl.ForEach, idx)
+
+			// Clone the entire template subtree for this index
+			for _, tc := range templateTree {
+				clone := deepCopyComponent(tc)
+				clone.ComponentID = fmt.Sprintf("%s_%d", tc.ComponentID, idx)
+
+				// Rewrite parent references
+				if tc.ComponentID == tmpl.TemplateID {
+					clone.ParentID = comp.ComponentID
+					childIDs = append(childIDs, clone.ComponentID)
+				} else {
+					clone.ParentID = fmt.Sprintf("%s_%d", tc.ParentID, idx)
+				}
+
+				// Rewrite static children IDs
+				if clone.Children != nil && clone.Children.Static != nil {
+					newChildren := make([]string, len(clone.Children.Static))
+					for j, cid := range clone.Children.Static {
+						newChildren[j] = fmt.Sprintf("%s_%d", cid, idx)
+					}
+					clone.Children = &protocol.ChildList{Static: newChildren}
+				}
+
+				// Rewrite path references
+				s.rewritePaths(&clone, tmpl.ItemVariable, itemPath)
+
+				result = append(result, clone)
+			}
+		}
+
+		// Replace template children with static list
+		comp.Children = &protocol.ChildList{Static: childIDs}
+		result = append(result, comp)
+	}
+
+	// Remove template source components from the result
+	if len(usedAsTemplate) > 0 {
+		filtered := result[:0]
+		for _, c := range result {
+			if !usedAsTemplate[c.ComponentID] {
+				filtered = append(filtered, c)
+			}
+		}
+		result = filtered
+	}
+
+	return result
+}
+
+// collectTemplateTree returns the template root component and all its descendants.
+func (s *Surface) collectTemplateTree(rootID string, compMap map[string]*protocol.Component) []protocol.Component {
+	var tree []protocol.Component
+
+	// Find root
+	root, ok := compMap[rootID]
+	if !ok {
+		tc, found := s.tree.Get(rootID)
+		if !found {
+			return nil
+		}
+		root = tc
+	}
+	tree = append(tree, *root)
+
+	// BFS to collect all descendants
+	queue := []string{}
+	if root.Children != nil && root.Children.Static != nil {
+		queue = append(queue, root.Children.Static...)
+	}
+
+	for len(queue) > 0 {
+		cid := queue[0]
+		queue = queue[1:]
+
+		child, ok := compMap[cid]
+		if !ok {
+			tc, found := s.tree.Get(cid)
+			if !found {
+				continue
+			}
+			child = tc
+		}
+		tree = append(tree, *child)
+
+		if child.Children != nil && child.Children.Static != nil {
+			queue = append(queue, child.Children.Static...)
+		}
+	}
+
+	return tree
+}
+
+// rewritePaths replaces /{itemVariable}/... path references with the actual array index path.
+func (s *Surface) rewritePaths(comp *protocol.Component, itemVar string, itemPath string) {
+	prefix := "/" + itemVar
+	rewriteString := func(ds *protocol.DynamicString) {
+		if ds != nil && ds.IsPath {
+			ds.Path = rewritePath(ds.Path, prefix, itemPath)
+		}
+	}
+	rewriteNumber := func(dn *protocol.DynamicNumber) {
+		if dn != nil && dn.IsPath {
+			dn.Path = rewritePath(dn.Path, prefix, itemPath)
+		}
+	}
+	rewriteBool := func(db *protocol.DynamicBoolean) {
+		if db != nil && db.IsPath {
+			db.Path = rewritePath(db.Path, prefix, itemPath)
+		}
+	}
+
+	p := &comp.Props
+	rewriteString(p.Content)
+	rewriteString(p.Title)
+	rewriteString(p.Subtitle)
+	rewriteString(p.Label)
+	rewriteString(p.Placeholder)
+	rewriteString(p.Value)
+	rewriteString(p.Src)
+	rewriteString(p.Alt)
+	rewriteString(p.Name)
+	rewriteString(p.DateValue)
+	rewriteNumber(p.Min)
+	rewriteNumber(p.Max)
+	rewriteNumber(p.Step)
+	rewriteNumber(p.SliderValue)
+	rewriteBool(p.Disabled)
+	rewriteBool(p.Checked)
+	rewriteBool(p.ReadOnly)
+	rewriteBool(p.Collapsible)
+	rewriteBool(p.Collapsed)
+	rewriteBool(p.EnableDate)
+	rewriteBool(p.EnableTime)
+	rewriteBool(p.MutuallyExclusive)
+
+	// Rewrite data binding
+	if p.DataBinding != "" {
+		p.DataBinding = rewritePath(p.DataBinding, prefix, itemPath)
+	}
+}
+
+// deepCopyComponent creates a deep copy of a component, including all pointer fields in Props.
+func deepCopyComponent(c protocol.Component) protocol.Component {
+	clone := c
+	p := &clone.Props
+
+	// Deep copy all DynamicString pointers
+	if p.Content != nil {
+		v := *p.Content
+		p.Content = &v
+	}
+	if p.Title != nil {
+		v := *p.Title
+		p.Title = &v
+	}
+	if p.Subtitle != nil {
+		v := *p.Subtitle
+		p.Subtitle = &v
+	}
+	if p.Label != nil {
+		v := *p.Label
+		p.Label = &v
+	}
+	if p.Placeholder != nil {
+		v := *p.Placeholder
+		p.Placeholder = &v
+	}
+	if p.Value != nil {
+		v := *p.Value
+		p.Value = &v
+	}
+	if p.Src != nil {
+		v := *p.Src
+		p.Src = &v
+	}
+	if p.Alt != nil {
+		v := *p.Alt
+		p.Alt = &v
+	}
+	if p.Name != nil {
+		v := *p.Name
+		p.Name = &v
+	}
+	if p.DateValue != nil {
+		v := *p.DateValue
+		p.DateValue = &v
+	}
+
+	// Deep copy DynamicNumber pointers
+	if p.Min != nil {
+		v := *p.Min
+		p.Min = &v
+	}
+	if p.Max != nil {
+		v := *p.Max
+		p.Max = &v
+	}
+	if p.Step != nil {
+		v := *p.Step
+		p.Step = &v
+	}
+	if p.SliderValue != nil {
+		v := *p.SliderValue
+		p.SliderValue = &v
+	}
+
+	// Deep copy DynamicBoolean pointers
+	if p.Disabled != nil {
+		v := *p.Disabled
+		p.Disabled = &v
+	}
+	if p.Checked != nil {
+		v := *p.Checked
+		p.Checked = &v
+	}
+	if p.ReadOnly != nil {
+		v := *p.ReadOnly
+		p.ReadOnly = &v
+	}
+	if p.Collapsible != nil {
+		v := *p.Collapsible
+		p.Collapsible = &v
+	}
+	if p.Collapsed != nil {
+		v := *p.Collapsed
+		p.Collapsed = &v
+	}
+	if p.EnableDate != nil {
+		v := *p.EnableDate
+		p.EnableDate = &v
+	}
+	if p.EnableTime != nil {
+		v := *p.EnableTime
+		p.EnableTime = &v
+	}
+	if p.MutuallyExclusive != nil {
+		v := *p.MutuallyExclusive
+		p.MutuallyExclusive = &v
+	}
+	if p.Visible != nil {
+		v := *p.Visible
+		p.Visible = &v
+	}
+
+	// Deep copy children
+	if c.Children != nil {
+		cl := *c.Children
+		if cl.Static != nil {
+			s := make([]string, len(cl.Static))
+			copy(s, cl.Static)
+			cl.Static = s
+		}
+		clone.Children = &cl
+	}
+
+	return clone
+}
+
+func rewritePath(path, prefix, replacement string) string {
+	if path == prefix {
+		return replacement
+	}
+	if len(path) > len(prefix) && path[:len(prefix)+1] == prefix+"/" {
+		return replacement + path[len(prefix):]
+	}
+	return path
 }
