@@ -799,6 +799,86 @@ func TestE2EModalFixture(t *testing.T) {
 	}
 }
 
+func TestE2EVideoFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "video.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout")
+	}
+
+	// Video component created with correct resolved props
+	playerNode := mock.LastNode("video", "player")
+	if playerNode == nil {
+		t.Fatal("player not created")
+	}
+	if playerNode.Type != protocol.CompVideo {
+		t.Errorf("player type = %q, want Video", playerNode.Type)
+	}
+	if playerNode.Props.Src == "" {
+		t.Error("player src is empty")
+	}
+	if playerNode.Props.Width != 560 {
+		t.Errorf("player width = %d, want 560", playerNode.Props.Width)
+	}
+	if playerNode.Props.Height != 315 {
+		t.Errorf("player height = %d, want 315", playerNode.Props.Height)
+	}
+	if !playerNode.Props.Controls {
+		t.Error("player controls should be true")
+	}
+	if playerNode.Props.Autoplay {
+		t.Error("player autoplay should be false")
+	}
+	if playerNode.Props.Loop {
+		t.Error("player loop should be false")
+	}
+	if !playerNode.Props.Muted {
+		t.Error("player muted should be true")
+	}
+}
+
+func TestE2EVideoTests(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+
+	results, err := RunTestFile(filepath.Join(fixtureDir(), "video_test.jsonl"), mock, disp)
+	if err != nil {
+		t.Fatalf("RunTestFile: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("no tests found in video_test.jsonl")
+	}
+
+	passed := 0
+	totalAssertions := 0
+	for _, r := range results {
+		totalAssertions += r.Assertions
+		if r.Passed {
+			passed++
+		} else {
+			t.Errorf("FAIL: %s: %s", r.Name, r.Error)
+		}
+	}
+
+	t.Logf("%d/%d tests passed, %d assertions total", passed, len(results), totalAssertions)
+}
+
 func TestE2EModalTests(t *testing.T) {
 	mock := renderer.NewMockRenderer()
 	disp := &renderer.MockDispatcher{}

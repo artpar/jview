@@ -117,6 +117,13 @@ type Props struct {
 	Visible   *DynamicBoolean `json:"visible,omitempty"`
 	OnDismiss *EventAction    `json:"onDismiss,omitempty"`
 
+	// Video
+	Autoplay *DynamicBoolean `json:"autoplay,omitempty"`
+	Loop     *DynamicBoolean `json:"loop,omitempty"`
+	Controls *DynamicBoolean `json:"controls,omitempty"`
+	Muted    *DynamicBoolean `json:"muted,omitempty"`
+	OnEnded  *EventAction    `json:"onEnded,omitempty"`
+
 	// ChoicePicker
 	Options           json.RawMessage `json:"options,omitempty"`
 	Selected          *DynamicStringList `json:"selected,omitempty"`

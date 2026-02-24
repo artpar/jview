@@ -532,6 +532,23 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 			s.trackCallback(comp.ComponentID, "select", cbID)
 		}
 
+	case protocol.CompVideo:
+		if comp.Props.OnEnded != nil && comp.Props.OnEnded.Action != nil {
+			action := comp.Props.OnEnded.Action
+			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "ended", func(data string) {
+				if action.Event != nil {
+					resolved := s.resolveDataRefs(action.Event)
+					if s.ActionHandler != nil {
+						s.ActionHandler(s.id, action.Event, resolved)
+					}
+				} else if action.FunctionCall != nil {
+					s.executeFunctionCall(action.FunctionCall)
+				}
+			})
+			node.Callbacks["ended"] = cbID
+			s.trackCallback(comp.ComponentID, "ended", cbID)
+		}
+
 	case protocol.CompModal:
 		binding := comp.Props.DataBinding
 		compID := comp.ComponentID
@@ -922,6 +939,10 @@ func (s *Surface) rewritePaths(comp *protocol.Component, itemVar string, itemPat
 	rewriteBool(p.EnableTime)
 	rewriteBool(p.MutuallyExclusive)
 	rewriteBool(p.Visible)
+	rewriteBool(p.Autoplay)
+	rewriteBool(p.Loop)
+	rewriteBool(p.Controls)
+	rewriteBool(p.Muted)
 
 	// Rewrite data binding
 	if p.DataBinding != "" {
@@ -949,6 +970,7 @@ func (s *Surface) rewritePaths(comp *protocol.Component, itemVar string, itemPat
 	rewriteAction(p.OnSelect)
 	rewriteAction(p.OnDateChange)
 	rewriteAction(p.OnDismiss)
+	rewriteAction(p.OnEnded)
 }
 
 // deepCopyComponent creates a deep copy of a component, including all pointer fields in Props.
@@ -1057,6 +1079,22 @@ func deepCopyComponent(c protocol.Component) protocol.Component {
 		v := *p.Visible
 		p.Visible = &v
 	}
+	if p.Autoplay != nil {
+		v := *p.Autoplay
+		p.Autoplay = &v
+	}
+	if p.Loop != nil {
+		v := *p.Loop
+		p.Loop = &v
+	}
+	if p.Controls != nil {
+		v := *p.Controls
+		p.Controls = &v
+	}
+	if p.Muted != nil {
+		v := *p.Muted
+		p.Muted = &v
+	}
 
 	// Deep copy event actions (contain mutable Args trees)
 	p.OnClick = deepCopyEventAction(p.OnClick)
@@ -1066,6 +1104,7 @@ func deepCopyComponent(c protocol.Component) protocol.Component {
 	p.OnSelect = deepCopyEventAction(p.OnSelect)
 	p.OnDateChange = deepCopyEventAction(p.OnDateChange)
 	p.OnDismiss = deepCopyEventAction(p.OnDismiss)
+	p.OnEnded = deepCopyEventAction(p.OnEnded)
 
 	// Deep copy children
 	if c.Children != nil {

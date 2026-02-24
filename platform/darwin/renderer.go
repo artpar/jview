@@ -100,6 +100,8 @@ func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode)
 		handle = createTabsView(node, surfaceID)
 	case protocol.CompModal:
 		handle = createModalView(node, surfaceID)
+	case protocol.CompVideo:
+		handle = createVideoView(node, surfaceID)
 	default:
 		log.Printf("darwin: unsupported component type %s", node.Type)
 		return 0
@@ -152,6 +154,8 @@ func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle
 		updateTabsView(handle, node)
 	case protocol.CompModal:
 		updateModalView(handle, node)
+	case protocol.CompVideo:
+		updateVideoView(handle, node)
 	default:
 		log.Printf("darwin: unsupported update for component type %s", node.Type)
 	}

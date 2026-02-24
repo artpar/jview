@@ -86,6 +86,12 @@ type ResolvedProps struct {
 
 	// Modal
 	Visible bool `json:"visible,omitempty"`
+
+	// Video
+	Autoplay bool `json:"autoplay,omitempty"`
+	Loop     bool `json:"loop,omitempty"`
+	Controls bool `json:"controls,omitempty"`
+	Muted    bool `json:"muted,omitempty"`
 }
 
 // OptionItem represents a single option in a ChoicePicker.
