@@ -105,6 +105,7 @@ Two modes:
 | DateTimeInput | Date/time picker |
 | Modal | Floating dialog panel |
 | Video | AVPlayerView video playback |
+| AudioPlayer | Compact audio controls (play/pause, scrubber, time) |
 
 ### Reusable Abstractions
 
@@ -226,7 +227,7 @@ All tests run with `-race` detection enabled.
 
 ```bash
 make test          # Headless unit + integration tests (300+ tests)
-make verify        # Build + screenshot capture for all fixtures (26 fixtures)
+make verify        # Build + screenshot capture for all fixtures (31 fixtures)
 make check         # Both (the gate)
 
 # Native e2e tests (real AppKit, no display needed)

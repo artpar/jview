@@ -905,3 +905,70 @@ func TestE2EModalTests(t *testing.T) {
 
 	t.Logf("%d/%d tests passed, %d assertions total", passed, len(results), totalAssertions)
 }
+
+func TestE2EAudioFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "audio.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout")
+	}
+
+	playerNode := mock.LastNode("audio", "player")
+	if playerNode == nil {
+		t.Fatal("player not created")
+	}
+	if playerNode.Type != protocol.CompAudioPlayer {
+		t.Errorf("player type = %q, want AudioPlayer", playerNode.Type)
+	}
+	if playerNode.Props.Src == "" {
+		t.Error("player src is empty")
+	}
+	if playerNode.Props.Autoplay {
+		t.Error("player autoplay should be false")
+	}
+	if playerNode.Props.Loop {
+		t.Error("player loop should be false")
+	}
+}
+
+func TestE2EAudioTests(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+
+	results, err := RunTestFile(filepath.Join(fixtureDir(), "audio_test.jsonl"), mock, disp)
+	if err != nil {
+		t.Fatalf("RunTestFile: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("no tests found in audio_test.jsonl")
+	}
+
+	passed := 0
+	totalAssertions := 0
+	for _, r := range results {
+		totalAssertions += r.Assertions
+		if r.Passed {
+			passed++
+		} else {
+			t.Errorf("FAIL: %s: %s", r.Name, r.Error)
+		}
+	}
+
+	t.Logf("%d/%d tests passed, %d assertions total", passed, len(results), totalAssertions)
+}

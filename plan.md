@@ -46,12 +46,12 @@ Live agent connectivity and remaining A2UI components.
 
 ### Components
 
-| Component | Priority | Description |
-|-----------|----------|-------------|
-| Tabs | high | NSTabView with tab definitions. Props: `tabs` (array of `{id, label, children}`). |
-| Modal | high | NSPanel or sheet presentation. Props: `visible`, `onDismiss`. Needs overlay management. |
-| Video | medium | AVPlayerView. Props from A2UI spec TBD. |
-| AudioPlayer | low | AVAudioPlayer with playback controls. |
+| Component | Priority | Status | Description |
+|-----------|----------|--------|-------------|
+| Tabs | high | **done** | NSTabView with tabLabels, activeTab data binding, tab selection callbacks. |
+| Modal | high | **done** | NSPanel floating dialog with data-bound visible state, onDismiss callback. |
+| Video | medium | **done** | AVPlayerView with src, autoplay, loop, controls, muted, onEnded callback. |
+| AudioPlayer | low | **done** | AVPlayer compact control bar (play/pause, scrubber, time label) with src, autoplay, loop, onEnded. |
 
 ### Infrastructure
 
