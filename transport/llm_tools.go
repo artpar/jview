@@ -238,6 +238,42 @@ func a2uiTools() []anyllm.Tool {
 				},
 			},
 		},
+		{
+			Type: "function",
+			Function: anyllm.Function{
+				Name:        "a2ui_defineFunction",
+				Description: "Define a reusable function with parameters. The body is a JSON expression tree (using functionCall, path refs, and literals) where {\"param\":\"name\"} nodes get replaced with argument values at call time. User-defined functions can be used anywhere a built-in function can: in value expressions, in button onClick actions, etc.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"name":   map[string]any{"type": "string", "description": "Function name (must not conflict with built-in functions)"},
+						"params": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Parameter names (positional)"},
+						"body":   map[string]any{"description": "JSON expression tree with {\"param\":\"name\"} placeholders"},
+					},
+					"required": []string{"name", "params", "body"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: anyllm.Function{
+				Name:        "a2ui_defineComponent",
+				Description: "Define a reusable component template with parameters. Use {\"param\":\"name\"} in props/style/actions for parameterization. Use \"$/path\" for scoped data paths (replaced with scope prefix at instantiation). The definition must have exactly one component with componentId \"_root\". Instantiate with useComponent in a2ui_updateComponents.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"name":   map[string]any{"type": "string", "description": "Component template name"},
+						"params": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Parameter names"},
+						"components": map[string]any{
+							"type":        "array",
+							"description": "Component definitions forming the template. Use _root as the main component's ID.",
+							"items":       map[string]any{"type": "object"},
+						},
+					},
+					"required": []string{"name", "params", "components"},
+				},
+			},
+		},
 	}
 }
 
@@ -488,12 +524,54 @@ a2ui_loadAssets({"assets": [
 ]})
 Then: Image src "asset:logo", or Text style {"fontFamily": "Custom Font Family Name"}
 
+REUSABLE FUNCTIONS (defineFunction):
+Define reusable expression trees with parameters. Use {\"param\":\"name\"} as placeholders in the body:
+
+a2ui_defineFunction({
+  "name": "appendDigit",
+  "params": ["digit"],
+  "body": {"functionCall":{"name":"if","args":[
+    {"functionCall":{"name":"or","args":[{"path":"/clearOnInput"},{"functionCall":{"name":"equals","args":[{"path":"/display"},"0"]}}]}},
+    {"param":"digit"},
+    {"functionCall":{"name":"concat","args":[{"path":"/display"},{"param":"digit"}]}}
+  ]}}
+})
+
+Then call: {"functionCall":{"name":"appendDigit","args":["7"]}}
+User functions are checked after built-ins, before FFI. They can call other user functions.
+
+REUSABLE COMPONENTS (defineComponent):
+Define component templates with parameters. Use {\"param\":\"name\"} for parameterization and \"$/path\" for scoped data:
+
+a2ui_defineComponent({
+  "name": "DigitButton",
+  "params": ["digit", "label"],
+  "components": [
+    {"componentId":"_root","type":"Button","props":{
+      "label":{"param":"label"},
+      "onClick":{"action":{"functionCall":{"call":"updateDataModel","args":{"ops":[
+        {"op":"replace","path":"/display","value":{"functionCall":{"name":"appendDigit","args":[{"param":"digit"}]}}}
+      ]}}}}
+    },"style":{"backgroundColor":"#333","cornerRadius":33,"width":66,"height":66}}
+  ]
+})
+
+Instantiate in updateComponents: {"componentId":"btn7","useComponent":"DigitButton","args":{"digit":"7","label":"7"}}
+
+Rules:
+- Definition must have exactly one _root component (becomes the instance ID)
+- Other IDs become {instanceId}_{originalId} (e.g. btn7__label)
+- \"$/path\" is replaced with scope prefix (default: /instanceId)
+- Use explicit scope for shared state: {"scope":"/calc1"}
+
 WORKFLOW:
-1. Call a2ui_loadAssets if you need custom fonts or want to preload images (optional)
-2. Call a2ui_createSurface to create a window (optionally with backgroundColor and padding)
-3. Call a2ui_updateDataModel to set initial data (if needed)
-4. Call a2ui_updateComponents to create the component tree
-5. When the user interacts (clicks a button), you'll receive the action details. Respond by updating data or components.
+1. Call a2ui_defineFunction to register reusable functions (optional)
+2. Call a2ui_defineComponent to register reusable component templates (optional)
+3. Call a2ui_loadAssets if you need custom fonts or want to preload images (optional)
+4. Call a2ui_createSurface to create a window (optionally with backgroundColor and padding)
+5. Call a2ui_updateDataModel to set initial data (if needed)
+6. Call a2ui_updateComponents to create the component tree (can use useComponent for defined templates)
+7. When the user interacts (clicks a button), you'll receive the action details. Respond by updating data or components.
 
 COMPONENT TREE RULES:
 - Every component needs a unique componentId

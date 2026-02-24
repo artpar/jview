@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"jview/protocol"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -131,5 +132,83 @@ func TestFileTransportEmptyFile(t *testing.T) {
 	errs := drainErrorsWithTimeout(t, ft.Errors(), time.Second)
 	if len(errs) != 0 {
 		t.Errorf("unexpected errors: %v", errs)
+	}
+}
+
+func TestFileTransportInclude(t *testing.T) {
+	defer goroutineLeakCheck(t)()
+
+	ft := NewFileTransport(filepath.Join(fixtureDir(), "includes", "main.jsonl"))
+	ft.Start()
+
+	msgs := drainWithTimeout(t, ft.Messages(), 5*time.Second)
+	errs := drainErrorsWithTimeout(t, ft.Errors(), time.Second)
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	// main.jsonl includes defs.jsonl (1 defineFunction message), then has createSurface + updateComponents
+	// So we should get: defineFunction, createSurface, updateComponents = 3 messages
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 messages, got %d", len(msgs))
+	}
+	if msgs[0].Type != protocol.MsgDefineFunction {
+		t.Errorf("msg[0].Type = %q, want defineFunction", msgs[0].Type)
+	}
+	if msgs[1].Type != protocol.MsgCreateSurface {
+		t.Errorf("msg[1].Type = %q, want createSurface", msgs[1].Type)
+	}
+	if msgs[2].Type != protocol.MsgUpdateComponents {
+		t.Errorf("msg[2].Type = %q, want updateComponents", msgs[2].Type)
+	}
+}
+
+func TestFileTransportCircularInclude(t *testing.T) {
+	defer goroutineLeakCheck(t)()
+
+	// Create two files that include each other
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.jsonl")
+	b := filepath.Join(dir, "b.jsonl")
+	os.WriteFile(a, []byte(`{"type":"include","path":"b.jsonl"}`+"\n"), 0644)
+	os.WriteFile(b, []byte(`{"type":"include","path":"a.jsonl"}`+"\n"), 0644)
+
+	ft := NewFileTransport(a)
+	ft.Start()
+
+	drainWithTimeout(t, ft.Messages(), 5*time.Second)
+	errs := drainErrorsWithTimeout(t, ft.Errors(), time.Second)
+
+	if len(errs) == 0 {
+		t.Fatal("expected circular include error")
+	}
+}
+
+func TestFileTransportIncludeDepthLimit(t *testing.T) {
+	defer goroutineLeakCheck(t)()
+
+	// Create a chain of 12 includes (exceeds limit of 10)
+	dir := t.TempDir()
+	for i := 0; i < 12; i++ {
+		name := filepath.Join(dir, filepath.Base(filepath.Join(dir, "file"+string(rune('a'+i))+".jsonl")))
+		var content string
+		if i < 11 {
+			next := filepath.Join(dir, "file"+string(rune('a'+i+1))+".jsonl")
+			content = `{"type":"include","path":"` + filepath.Base(next) + `"}` + "\n"
+		} else {
+			content = `{"type":"createSurface","surfaceId":"s","title":"deep"}` + "\n"
+		}
+		os.WriteFile(name, []byte(content), 0644)
+	}
+
+	ft := NewFileTransport(filepath.Join(dir, "filea.jsonl"))
+	ft.Start()
+
+	drainWithTimeout(t, ft.Messages(), 5*time.Second)
+	errs := drainErrorsWithTimeout(t, ft.Errors(), time.Second)
+
+	if len(errs) == 0 {
+		t.Fatal("expected depth limit error")
 	}
 }

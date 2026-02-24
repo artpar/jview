@@ -10,7 +10,9 @@ import (
 	"jview/transport"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
+	"sort"
 
 	anyllm "github.com/mozilla-ai/any-llm-go"
 	"github.com/mozilla-ai/any-llm-go/providers/deepseek"
@@ -61,8 +63,8 @@ func main() {
 
 	args := flag.Args()
 	if len(args) > 0 && *prompt == "" {
-		// File mode: positional arg with no --prompt
-		tr = transport.NewFileTransport(args[0])
+		// File or directory mode: positional arg with no --prompt
+		tr = createFileTransport(args[0])
 	} else if *prompt != "" {
 		// Check cache for prompt-file mode
 		if *promptFile != "" && !*regenerate && transport.CacheValid(*promptFile) {
@@ -208,6 +210,41 @@ func main() {
 
 	// Run the macOS event loop (blocks forever)
 	darwin.AppRun()
+}
+
+// createFileTransport handles both single file and directory mode.
+// Directory mode: reads all *.jsonl files sorted lexicographically.
+func createFileTransport(path string) transport.Transport {
+	info, err := os.Stat(path)
+	if err != nil {
+		// Let FileTransport handle the error
+		return transport.NewFileTransport(path)
+	}
+	if !info.IsDir() {
+		return transport.NewFileTransport(path)
+	}
+
+	// Directory mode: create a virtual main.jsonl that includes all files
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".jsonl" {
+			files = append(files, e.Name())
+		}
+	}
+	sort.Strings(files)
+
+	if len(files) == 0 {
+		fmt.Fprintf(os.Stderr, "no .jsonl files found in %s\n", path)
+		os.Exit(1)
+	}
+
+	return transport.NewDirTransport(path, files)
 }
 
 func createProvider(name string, apiKey string) (anyllm.Provider, error) {

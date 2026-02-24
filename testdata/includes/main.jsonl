@@ -1,0 +1,3 @@
+{"type":"include","path":"defs.jsonl"}
+{"type":"createSurface","surfaceId":"main","title":"Include Test","width":400,"height":200}
+{"type":"updateComponents","surfaceId":"main","components":[{"componentId":"greeting","type":"Text","props":{"content":{"functionCall":{"name":"greet","args":["World"]}},"variant":"h1"}}]}

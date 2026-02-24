@@ -7,14 +7,22 @@ import (
 	"strings"
 )
 
+// FuncDef stores a user-defined function registered via defineFunction.
+type FuncDef struct {
+	Name   string
+	Params []string
+	Body   interface{}
+}
+
 // Evaluator handles FunctionCall evaluation against a DataModel.
 type Evaluator struct {
-	dm  *DataModel
-	FFI *FFIRegistry
+	dm          *DataModel
+	FFI         *FFIRegistry
+	customFuncs map[string]*FuncDef
 }
 
 func NewEvaluator(dm *DataModel) *Evaluator {
-	return &Evaluator{dm: dm}
+	return &Evaluator{dm: dm, customFuncs: make(map[string]*FuncDef)}
 }
 
 type evalFn func(e *Evaluator, args []interface{}) (interface{}, error)
@@ -83,6 +91,23 @@ func (e *Evaluator) Eval(name string, args []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return fn(e, resolved)
+	}
+
+	// Check custom (user-defined) functions
+	if def, ok := e.customFuncs[name]; ok {
+		if len(args) != len(def.Params) {
+			return nil, fmt.Errorf("%s: expected %d args, got %d", name, len(def.Params), len(args))
+		}
+		resolved, err := e.resolveArgs(args)
+		if err != nil {
+			return nil, err
+		}
+		paramMap := make(map[string]interface{}, len(def.Params))
+		for i, p := range def.Params {
+			paramMap[p] = resolved[i]
+		}
+		substituted := substituteParams(deepCopyJSON(def.Body), paramMap)
+		return e.resolveArg(substituted)
 	}
 
 	// Fallthrough to FFI registry for native functions

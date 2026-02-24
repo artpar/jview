@@ -107,6 +107,27 @@ func (p *Parser) Next() (*Message, error) {
 		}
 		msg.Body = la
 
+	case MsgDefineFunction:
+		var df DefineFunction
+		if err := json.Unmarshal(env.Payload, &df); err != nil {
+			return nil, fmt.Errorf("parse defineFunction: %w", err)
+		}
+		msg.Body = df
+
+	case MsgDefineComponent:
+		var dc DefineComponent
+		if err := json.Unmarshal(env.Payload, &dc); err != nil {
+			return nil, fmt.Errorf("parse defineComponent: %w", err)
+		}
+		msg.Body = dc
+
+	case MsgInclude:
+		var inc Include
+		if err := json.Unmarshal(env.Payload, &inc); err != nil {
+			return nil, fmt.Errorf("parse include: %w", err)
+		}
+		msg.Body = inc
+
 	default:
 		return nil, fmt.Errorf("unknown message type: %s", env.Type)
 	}

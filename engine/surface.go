@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"fmt"
 	"jview/protocol"
 	"jview/renderer"
@@ -26,6 +27,12 @@ type Surface struct {
 	// validationErrors tracks current validation errors: componentID → []errorMessages
 	validationErrors map[string][]string
 
+	// funcDefs holds user-defined functions for the evaluator
+	funcDefs map[string]*FuncDef
+
+	// compDefs holds user-defined component templates
+	compDefs map[string]*protocol.DefineComponent
+
 	// ActionHandler is called when a component triggers a server-bound event.
 	ActionHandler func(surfaceID string, event *protocol.EventDef, data map[string]interface{})
 }
@@ -50,6 +57,8 @@ func NewSurface(id string, rend renderer.Renderer, dispatch renderer.Dispatcher,
 		assets:           assets,
 		activeCallbacks:  make(map[string]map[string]renderer.CallbackID),
 		validationErrors: make(map[string][]string),
+		funcDefs:         make(map[string]*FuncDef),
+		compDefs:         make(map[string]*protocol.DefineComponent),
 	}
 }
 
@@ -65,9 +74,21 @@ func (s *Surface) SetAssets(assets *AssetRegistry) {
 	s.resolver.assets = assets
 }
 
+// SetFuncDefs updates the user-defined functions for this surface's evaluator.
+func (s *Surface) SetFuncDefs(defs map[string]*FuncDef) {
+	s.funcDefs = defs
+	s.resolver.evaluator.customFuncs = defs
+}
+
+// SetCompDefs updates the user-defined component templates for this surface.
+func (s *Surface) SetCompDefs(defs map[string]*protocol.DefineComponent) {
+	s.compDefs = defs
+}
+
 // HandleUpdateComponents processes a batch of component definitions.
 func (s *Surface) HandleUpdateComponents(msg protocol.UpdateComponents) {
-	expanded := s.expandTemplates(msg.Components)
+	comps := s.expandComponentInstances(msg.Components)
+	expanded := s.expandTemplates(comps)
 	changed := s.tree.Update(expanded)
 	s.renderComponents(changed)
 }
@@ -259,6 +280,7 @@ func (s *Surface) executeUpdateDataModel(args interface{}) {
 
 	evaluator := NewEvaluator(s.dm)
 	evaluator.FFI = s.ffi
+	evaluator.customFuncs = s.funcDefs
 	var allChanged []string
 
 	for _, opRaw := range ops {
@@ -472,6 +494,161 @@ func (s *Surface) trackCallback(componentID, eventType string, cbID renderer.Cal
 		s.activeCallbacks[componentID] = make(map[string]renderer.CallbackID)
 	}
 	s.activeCallbacks[componentID][eventType] = cbID
+}
+
+// expandComponentInstances expands useComponent references into concrete components.
+// Called before expandTemplates. For each component with UseComponent set:
+// 1. Looks up the definition
+// 2. Substitutes params
+// 3. Rewrites scoped paths ($/ prefix)
+// 4. Rewrites component IDs (_root → instanceId, others → instanceId__originalId)
+// 5. Parses back into protocol.Component structs
+func (s *Surface) expandComponentInstances(comps []protocol.Component) []protocol.Component {
+	var result []protocol.Component
+	for _, comp := range comps {
+		if comp.UseComponent == "" {
+			result = append(result, comp)
+			continue
+		}
+
+		def, ok := s.compDefs[comp.UseComponent]
+		if !ok {
+			log.Printf("surface %s: unknown component definition %q", s.id, comp.UseComponent)
+			result = append(result, comp)
+			continue
+		}
+
+		expanded := s.expandOneComponentInstance(comp, def)
+		result = append(result, expanded...)
+	}
+	return result
+}
+
+func (s *Surface) expandOneComponentInstance(inst protocol.Component, def *protocol.DefineComponent) []protocol.Component {
+	// Parse raw JSON components into maps
+	trees, err := jsonToMaps(def.Components)
+	if err != nil {
+		log.Printf("surface %s: parse component definition %q: %v", s.id, def.Name, err)
+		return []protocol.Component{inst}
+	}
+
+	// Build args map: use inst.Args, ensuring all param names map to something
+	args := make(map[string]interface{}, len(def.Params))
+	for _, p := range def.Params {
+		if v, ok := inst.Args[p]; ok {
+			args[p] = v
+		}
+	}
+
+	// Substitute params in each component tree
+	for i, tree := range trees {
+		trees[i] = substituteParams(tree, args).(map[string]interface{})
+	}
+
+	// Determine scope
+	scope := inst.Scope
+	if scope == "" {
+		// Check if definition uses scoped paths ($ prefix)
+		if treeHasScopedPaths(trees) {
+			scope = "/" + inst.ComponentID
+		}
+	}
+
+	// Rewrite scoped paths if scope is set
+	if scope != "" {
+		for i, tree := range trees {
+			trees[i] = rewriteScopedPaths(tree, scope).(map[string]interface{})
+		}
+	}
+
+	// Build ID map: _root → instanceId, _X → instanceId__X
+	idMap := make(map[string]string, len(trees))
+	for _, tree := range trees {
+		cid, _ := tree["componentId"].(string)
+		if cid == "_root" {
+			idMap[cid] = inst.ComponentID
+		} else {
+			idMap[cid] = inst.ComponentID + "_" + cid
+		}
+	}
+
+	// Rewrite IDs
+	rewriteComponentIDs(trees, idMap)
+
+	// Apply parent/style from the instance to _root (now the instance ID)
+	for _, tree := range trees {
+		cid, _ := tree["componentId"].(string)
+		if cid == inst.ComponentID {
+			// Preserve parentId from instantiation
+			if inst.ParentID != "" {
+				tree["parentId"] = inst.ParentID
+			}
+			// Merge instance-level style onto definition style
+			if inst.Style != (protocol.StyleProps{}) {
+				instStyleJSON, _ := json.Marshal(inst.Style)
+				var instStyle map[string]interface{}
+				json.Unmarshal(instStyleJSON, &instStyle)
+				if existing, ok := tree["style"].(map[string]interface{}); ok {
+					for k, v := range instStyle {
+						existing[k] = v
+					}
+				} else {
+					tree["style"] = instStyle
+				}
+			}
+			break
+		}
+	}
+
+	// Re-serialize and parse into protocol.Component structs
+	var result []protocol.Component
+	for _, tree := range trees {
+		data, err := json.Marshal(tree)
+		if err != nil {
+			log.Printf("surface %s: marshal expanded component: %v", s.id, err)
+			continue
+		}
+		var comp protocol.Component
+		if err := json.Unmarshal(data, &comp); err != nil {
+			log.Printf("surface %s: unmarshal expanded component: %v", s.id, err)
+			continue
+		}
+		result = append(result, comp)
+	}
+
+	return result
+}
+
+// treeHasScopedPaths checks if any string value in the trees starts with "$/".
+func treeHasScopedPaths(trees []map[string]interface{}) bool {
+	for _, tree := range trees {
+		if valuHasScopedPath(tree) {
+			return true
+		}
+	}
+	return false
+}
+
+func valuHasScopedPath(val interface{}) bool {
+	switch v := val.(type) {
+	case map[string]interface{}:
+		for _, child := range v {
+			if valuHasScopedPath(child) {
+				return true
+			}
+		}
+	case []interface{}:
+		for _, child := range v {
+			if valuHasScopedPath(child) {
+				return true
+			}
+		}
+	case string:
+		if len(v) >= 2 && v[0] == '$' && v[1] == '/' {
+			return true
+		}
+	}
+	return false
 }
 
 // expandTemplates processes components with template children, expanding them

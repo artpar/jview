@@ -42,12 +42,15 @@ type StyleProps struct {
 
 // Component is a single A2UI component definition.
 type Component struct {
-	ComponentID string        `json:"componentId"`
-	Type        ComponentType `json:"type"`
-	ParentID    string        `json:"parentId,omitempty"`
-	Children    *ChildList    `json:"children,omitempty"`
-	Props       Props         `json:"props,omitempty"`
-	Style       StyleProps    `json:"style,omitempty"`
+	ComponentID  string                 `json:"componentId"`
+	Type         ComponentType          `json:"type,omitempty"`
+	ParentID     string                 `json:"parentId,omitempty"`
+	Children     *ChildList             `json:"children,omitempty"`
+	Props        Props                  `json:"props,omitempty"`
+	Style        StyleProps             `json:"style,omitempty"`
+	UseComponent string                 `json:"useComponent,omitempty"`
+	Args         map[string]interface{} `json:"args,omitempty"`
+	Scope        string                 `json:"scope,omitempty"`
 }
 
 // Props holds all possible component properties across types.

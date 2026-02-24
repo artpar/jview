@@ -1,0 +1,2 @@
+{"type":"defineFunction","name":"appendDigit","params":["digit"],"body":{"functionCall":{"name":"if","args":[{"functionCall":{"name":"or","args":[{"path":"/clearOnInput"},{"functionCall":{"name":"equals","args":[{"path":"/display"},"0"]}}]}}  ,{"param":"digit"},{"functionCall":{"name":"concat","args":[{"path":"/display"},{"param":"digit"}]}}]}}}
+{"type":"defineFunction","name":"setOperator","params":["op"],"body":{"functionCall":{"name":"toNumber","args":[{"path":"/display"}]}}}

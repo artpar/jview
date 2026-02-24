@@ -393,3 +393,90 @@ func TestParseChildListTemplate(t *testing.T) {
 		t.Errorf("templateId = %q, want item_tmpl", cl.Template.TemplateID)
 	}
 }
+
+func TestParseDefineFunction(t *testing.T) {
+	input := `{"type":"defineFunction","name":"double","params":["x"],"body":{"functionCall":{"name":"multiply","args":[{"param":"x"},2]}}}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Type != MsgDefineFunction {
+		t.Errorf("type = %q, want defineFunction", msg.Type)
+	}
+	df := msg.Body.(DefineFunction)
+	if df.Name != "double" {
+		t.Errorf("name = %q, want double", df.Name)
+	}
+	if len(df.Params) != 1 || df.Params[0] != "x" {
+		t.Errorf("params = %v, want [x]", df.Params)
+	}
+	if df.Body == nil {
+		t.Fatal("body is nil")
+	}
+}
+
+func TestParseDefineComponent(t *testing.T) {
+	input := `{"type":"defineComponent","name":"Btn","params":["label"],"components":[{"componentId":"_root","type":"Button","props":{"label":{"param":"label"}}}]}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Type != MsgDefineComponent {
+		t.Errorf("type = %q, want defineComponent", msg.Type)
+	}
+	dc := msg.Body.(DefineComponent)
+	if dc.Name != "Btn" {
+		t.Errorf("name = %q, want Btn", dc.Name)
+	}
+	if len(dc.Params) != 1 || dc.Params[0] != "label" {
+		t.Errorf("params = %v, want [label]", dc.Params)
+	}
+	if len(dc.Components) != 1 {
+		t.Fatalf("components = %d, want 1", len(dc.Components))
+	}
+}
+
+func TestParseInclude(t *testing.T) {
+	input := `{"type":"include","path":"components/buttons.jsonl"}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Type != MsgInclude {
+		t.Errorf("type = %q, want include", msg.Type)
+	}
+	inc := msg.Body.(Include)
+	if inc.Path != "components/buttons.jsonl" {
+		t.Errorf("path = %q, want components/buttons.jsonl", inc.Path)
+	}
+}
+
+func TestParseUseComponent(t *testing.T) {
+	input := `{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn7","useComponent":"DigitButton","args":{"digit":"7","label":"7"}}]}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	uc := msg.Body.(UpdateComponents)
+	if len(uc.Components) != 1 {
+		t.Fatalf("components = %d, want 1", len(uc.Components))
+	}
+	comp := uc.Components[0]
+	if comp.UseComponent != "DigitButton" {
+		t.Errorf("useComponent = %q, want DigitButton", comp.UseComponent)
+	}
+	if comp.Args["digit"] != "7" {
+		t.Errorf("args.digit = %v, want '7'", comp.Args["digit"])
+	}
+	if comp.Args["label"] != "7" {
+		t.Errorf("args.label = %v, want '7'", comp.Args["label"])
+	}
+}

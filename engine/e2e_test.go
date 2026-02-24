@@ -297,3 +297,280 @@ func TestE2ECalculatorTests(t *testing.T) {
 
 	t.Logf("%d/%d tests passed, %d assertions total", passed, len(results), totalAssertions)
 }
+
+func TestE2ECustomFunctionsFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "custom_functions.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for file transport")
+	}
+
+	// Display should show "0"
+	node := mock.LastNode("main", "display")
+	if node == nil {
+		t.Fatal("display not created")
+	}
+	if node.Props.Content != "0" {
+		t.Errorf("display = %q, want '0'", node.Props.Content)
+	}
+
+	// Click button 1 — should update display to "1"
+	beforeUpdates := len(mock.Updated)
+	mock.InvokeCallback("main", "btn1", "click", "")
+
+	found := false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "display" {
+			found = true
+			if u.Node.Props.Content != "1" {
+				t.Errorf("display after btn1 click = %q, want '1'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !found {
+		t.Error("display not updated after btn1 click")
+	}
+
+	// Click button 2 — should append to get "12"
+	beforeUpdates = len(mock.Updated)
+	mock.InvokeCallback("main", "btn2", "click", "")
+
+	found = false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "display" {
+			found = true
+			if u.Node.Props.Content != "12" {
+				t.Errorf("display after btn2 click = %q, want '12'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !found {
+		t.Error("display not updated after btn2 click")
+	}
+}
+
+func TestE2EComponentDefsFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "component_defs.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for file transport")
+	}
+
+	// DigitButton instances should be expanded
+	btn1Node := mock.LastNode("main", "btn1")
+	if btn1Node == nil {
+		t.Fatal("btn1 not created")
+	}
+	if btn1Node.Props.Label != "1" {
+		t.Errorf("btn1 label = %q, want '1'", btn1Node.Props.Label)
+	}
+	if btn1Node.Type != "Button" {
+		t.Errorf("btn1 type = %q, want Button", btn1Node.Type)
+	}
+
+	// OpButton instance
+	btnAddNode := mock.LastNode("main", "btnAdd")
+	if btnAddNode == nil {
+		t.Fatal("btnAdd not created")
+	}
+	if btnAddNode.Props.Label != "+" {
+		t.Errorf("btnAdd label = %q, want '+'", btnAddNode.Props.Label)
+	}
+}
+
+func TestE2EIncludeFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "includes", "main.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for file transport")
+	}
+
+	// The greeting should use the included greet function
+	node := mock.LastNode("main", "greeting")
+	if node == nil {
+		t.Fatal("greeting not created")
+	}
+	if node.Props.Content != "Hello, World!" {
+		t.Errorf("greeting = %q, want 'Hello, World!'", node.Props.Content)
+	}
+}
+
+func TestE2ECalculatorV2Fixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "calculator_v2", "main.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for file transport")
+	}
+
+	// Display should show "0"
+	displayNode := mock.LastNode("calculator", "displayText")
+	if displayNode == nil {
+		t.Fatal("displayText not created")
+	}
+	if displayNode.Props.Content != "0" {
+		t.Errorf("display = %q, want '0'", displayNode.Props.Content)
+	}
+
+	// Digit buttons should be expanded from DigitButton components
+	btn7Node := mock.LastNode("calculator", "btn7")
+	if btn7Node == nil {
+		t.Fatal("btn7 not created")
+	}
+	if btn7Node.Props.Label != "7" {
+		t.Errorf("btn7 label = %q, want '7'", btn7Node.Props.Label)
+	}
+
+	// Op buttons should be expanded
+	btnAddNode := mock.LastNode("calculator", "btnAdd")
+	if btnAddNode == nil {
+		t.Fatal("btnAdd not created")
+	}
+	if btnAddNode.Props.Label != "+" {
+		t.Errorf("btnAdd label = %q, want '+'", btnAddNode.Props.Label)
+	}
+
+	// Test calculation: 7 + 3 =
+	mock.InvokeCallback("calculator", "btn7", "click", "")
+	mock.InvokeCallback("calculator", "btnAdd", "click", "")
+	mock.InvokeCallback("calculator", "btn3", "click", "")
+
+	beforeUpdates := len(mock.Updated)
+	mock.InvokeCallback("calculator", "btnEquals", "click", "")
+
+	found := false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "displayText" {
+			found = true
+			if u.Node.Props.Content != "10" {
+				t.Errorf("display after 7+3= = %q, want '10'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !found {
+		t.Error("display not updated after equals")
+	}
+}
+
+func TestE2EScopedComponentsFixture(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	ft := transport.NewFileTransport(filepath.Join(fixtureDir(), "scoped_components.jsonl"))
+	ft.Start()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for msg := range ft.Messages() {
+			sess.HandleMessage(msg)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for file transport")
+	}
+
+	// Counter A should show "0" from /c1/count
+	c1Display := mock.LastNode("main", "c1__display")
+	if c1Display == nil {
+		t.Fatal("c1__display not created")
+	}
+	if c1Display.Props.Content != "0" {
+		t.Errorf("c1 display = %q, want '0'", c1Display.Props.Content)
+	}
+
+	// Counter B should show "100" from /c2/count
+	c2Display := mock.LastNode("main", "c2__display")
+	if c2Display == nil {
+		t.Fatal("c2__display not created")
+	}
+	if c2Display.Props.Content != "100" {
+		t.Errorf("c2 display = %q, want '100'", c2Display.Props.Content)
+	}
+
+	// Click increment on Counter A — should update c1's count from "0" to "1"
+	beforeUpdates := len(mock.Updated)
+	mock.InvokeCallback("main", "c1__btn", "click", "")
+
+	found := false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "c1__display" {
+			found = true
+			if u.Node.Props.Content != "1" {
+				t.Errorf("c1 display after increment = %q, want '1'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !found {
+		t.Error("c1__display not updated after increment")
+	}
+
+	// Counter B should be unchanged
+	c2Node := mock.LastNode("main", "c2__display")
+	if c2Node.Props.Content != "100" {
+		t.Errorf("c2 display after c1 increment = %q, want '100'", c2Node.Props.Content)
+	}
+}

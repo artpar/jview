@@ -845,3 +845,218 @@ func TestSessionUnknownMessageType(t *testing.T) {
 	}
 	sess.HandleMessage(msg)
 }
+
+func TestDefineFunction(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"defineFunction","name":"double","params":["x"],"body":{"functionCall":{"name":"multiply","args":[{"param":"x"},2]}}}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/val","value":5}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"t1","type":"Text","props":{"content":{"functionCall":{"name":"double","args":[{"path":"/val"}]}}}}]}`)
+
+	node := mock.LastNode("s1", "t1")
+	if node == nil {
+		t.Fatal("t1 not created")
+	}
+	if node.Props.Content != "10" {
+		t.Errorf("content = %q, want '10'", node.Props.Content)
+	}
+}
+
+func TestDefineFunctionInButtonAction(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"defineFunction","name":"appendDigit","params":["digit"],"body":{"functionCall":{"name":"if","args":[{"functionCall":{"name":"equals","args":[{"path":"/display"},"0"]}}  ,{"param":"digit"},{"functionCall":{"name":"concat","args":[{"path":"/display"},{"param":"digit"}]}}]}}}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/display","value":"0"}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"display","type":"Text","props":{"content":{"path":"/display"}}},{"componentId":"btn7","type":"Button","props":{"label":"7","onClick":{"action":{"functionCall":{"call":"updateDataModel","args":{"ops":[{"op":"replace","path":"/display","value":{"functionCall":{"name":"appendDigit","args":["7"]}}}]}}}}}}]}`)
+
+	// Display initially shows "0"
+	node := mock.LastNode("s1", "display")
+	if node == nil {
+		t.Fatal("display not created")
+	}
+	if node.Props.Content != "0" {
+		t.Errorf("initial display = %q, want '0'", node.Props.Content)
+	}
+
+	// Click button 7 — should replace "0" with "7"
+	beforeUpdates := len(mock.Updated)
+	mock.InvokeCallback("s1", "btn7", "click", "")
+
+	found := false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "display" {
+			found = true
+			if u.Node.Props.Content != "7" {
+				t.Errorf("display after click = %q, want '7'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !found {
+		t.Error("display not updated after button click")
+	}
+}
+
+func TestDefineFunctionArityCheck(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"defineFunction","name":"add2","params":["a","b"],"body":{"functionCall":{"name":"add","args":[{"param":"a"},{"param":"b"}]}}}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"t1","type":"Text","props":{"content":{"functionCall":{"name":"add2","args":[1]}}}}]}`)
+
+	// Should show empty string due to arity error
+	node := mock.LastNode("s1", "t1")
+	if node == nil {
+		t.Fatal("t1 not created")
+	}
+	if node.Props.Content != "" {
+		t.Errorf("content with arity error = %q, want empty", node.Props.Content)
+	}
+	_ = mock
+}
+
+func TestDefineComponent(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"defineComponent","name":"LabeledText","params":["text"],"components":[{"componentId":"_root","type":"Text","props":{"content":{"param":"text"},"variant":"h1"}}]}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"greeting","useComponent":"LabeledText","args":{"text":"Hello World"}}]}`)
+
+	node := mock.LastNode("s1", "greeting")
+	if node == nil {
+		t.Fatal("greeting not created")
+	}
+	if node.Props.Content != "Hello World" {
+		t.Errorf("content = %q, want 'Hello World'", node.Props.Content)
+	}
+	if node.Props.Variant != "h1" {
+		t.Errorf("variant = %q, want 'h1'", node.Props.Variant)
+	}
+}
+
+func TestDefineComponentWithChildren(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"defineComponent","name":"LabeledField","params":["label","binding"],"components":[{"componentId":"_root","type":"Column","children":["_label","_field"]},{"componentId":"_label","type":"Text","props":{"content":{"param":"label"}}},{"componentId":"_field","type":"TextField","props":{"placeholder":{"param":"label"},"dataBinding":{"param":"binding"}}}]}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/name","value":""}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"nameField","useComponent":"LabeledField","args":{"label":"Name","binding":"/name"}}]}`)
+
+	// Root column should be created with the instance ID
+	rootNode := mock.LastNode("s1", "nameField")
+	if rootNode == nil {
+		t.Fatal("nameField not created")
+	}
+	if rootNode.Type != protocol.CompColumn {
+		t.Errorf("type = %q, want Column", rootNode.Type)
+	}
+
+	// Label should be created with prefixed ID
+	labelNode := mock.LastNode("s1", "nameField__label")
+	if labelNode == nil {
+		t.Fatal("nameField__label not created")
+	}
+	if labelNode.Props.Content != "Name" {
+		t.Errorf("label content = %q, want 'Name'", labelNode.Props.Content)
+	}
+
+	// TextField should be created with prefixed ID
+	fieldNode := mock.LastNode("s1", "nameField__field")
+	if fieldNode == nil {
+		t.Fatal("nameField__field not created")
+	}
+	if fieldNode.Props.Placeholder != "Name" {
+		t.Errorf("placeholder = %q, want 'Name'", fieldNode.Props.Placeholder)
+	}
+}
+
+func TestDefineComponentScopedPaths(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"defineComponent","name":"Counter","params":["label"],"components":[{"componentId":"_root","type":"Column","children":["_display"]},{"componentId":"_display","type":"Text","props":{"content":{"path":"$/count"}}}]}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/c1/count","value":"42"}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"c1","useComponent":"Counter","args":{"label":"A"},"scope":"/c1"}]}`)
+
+	displayNode := mock.LastNode("s1", "c1__display")
+	if displayNode == nil {
+		t.Fatal("c1__display not created")
+	}
+	if displayNode.Props.Content != "42" {
+		t.Errorf("content = %q, want '42'", displayNode.Props.Content)
+	}
+}
+
+func TestDefineComponentDefaultScope(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"defineComponent","name":"ScopedText","params":[],"components":[{"componentId":"_root","type":"Text","props":{"content":{"path":"$/value"}}}]}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/myComp/value","value":"default scoped"}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"myComp","useComponent":"ScopedText","args":{}}]}`)
+
+	node := mock.LastNode("s1", "myComp")
+	if node == nil {
+		t.Fatal("myComp not created")
+	}
+	if node.Props.Content != "default scoped" {
+		t.Errorf("content = %q, want 'default scoped'", node.Props.Content)
+	}
+}
+
+func TestDefineFunctionRedefinition(t *testing.T) {
+	sess, mock := newTestSession()
+
+	feedMessages(t, sess, `{"type":"defineFunction","name":"greet","params":["name"],"body":{"functionCall":{"name":"concat","args":["Hello ",{"param":"name"}]}}}
+{"type":"defineFunction","name":"greet","params":["name"],"body":{"functionCall":{"name":"concat","args":["Hi ",{"param":"name"}]}}}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"t1","type":"Text","props":{"content":{"functionCall":{"name":"greet","args":["World"]}}}}]}`)
+
+	// Last definition wins
+	node := mock.LastNode("s1", "t1")
+	if node == nil {
+		t.Fatal("t1 not created")
+	}
+	if node.Props.Content != "Hi World" {
+		t.Errorf("content = %q, want 'Hi World'", node.Props.Content)
+	}
+	_ = mock
+}
+
+func TestDefineComponentWithFunctionCall(t *testing.T) {
+	sess, mock := newTestSession()
+
+	// Define a function and a component that uses it
+	feedMessages(t, sess, `{"type":"defineFunction","name":"appendDigit","params":["digit"],"body":{"functionCall":{"name":"if","args":[{"functionCall":{"name":"equals","args":[{"path":"/display"},"0"]}}  ,{"param":"digit"},{"functionCall":{"name":"concat","args":[{"path":"/display"},{"param":"digit"}]}}]}}}
+{"type":"defineComponent","name":"DigitButton","params":["digit","label"],"components":[{"componentId":"_root","type":"Button","props":{"label":{"param":"label"},"onClick":{"action":{"functionCall":{"call":"updateDataModel","args":{"ops":[{"op":"replace","path":"/display","value":{"functionCall":{"name":"appendDigit","args":[{"param":"digit"}]}}},{"op":"replace","path":"/clearOnInput","value":false}]}}}}}}]}
+{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/display","value":"0"},{"op":"add","path":"/clearOnInput","value":true}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"display","type":"Text","props":{"content":{"path":"/display"}}},{"componentId":"btn7","useComponent":"DigitButton","args":{"digit":"7","label":"7"}}]}`)
+
+	// Button should be created
+	btnNode := mock.LastNode("s1", "btn7")
+	if btnNode == nil {
+		t.Fatal("btn7 not created")
+	}
+	if btnNode.Props.Label != "7" {
+		t.Errorf("label = %q, want '7'", btnNode.Props.Label)
+	}
+
+	// Click button — should update display from "0" to "7" via appendDigit
+	beforeUpdates := len(mock.Updated)
+	mock.InvokeCallback("s1", "btn7", "click", "")
+
+	found := false
+	for _, u := range mock.Updated[beforeUpdates:] {
+		if u.Node != nil && u.Node.ComponentID == "display" {
+			found = true
+			if u.Node.Props.Content != "7" {
+				t.Errorf("display after click = %q, want '7'", u.Node.Props.Content)
+			}
+		}
+	}
+	if !found {
+		t.Error("display not updated after DigitButton click")
+	}
+}

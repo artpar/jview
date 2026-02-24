@@ -1,0 +1,1 @@
+{"type":"defineFunction","name":"greet","params":["name"],"body":{"functionCall":{"name":"concat","args":["Hello, ",{"param":"name"},"!"]}}}

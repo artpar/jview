@@ -13,6 +13,8 @@ type Session struct {
 	dispatch renderer.Dispatcher
 	ffi      *FFIRegistry
 	assets   *AssetRegistry
+	funcDefs map[string]*FuncDef
+	compDefs map[string]*protocol.DefineComponent
 
 	// OnAction is called when any surface triggers a server-bound event.
 	OnAction func(surfaceID string, event *protocol.EventDef, data map[string]interface{})
@@ -23,6 +25,8 @@ func NewSession(rend renderer.Renderer, dispatch renderer.Dispatcher) *Session {
 		surfaces: make(map[string]*Surface),
 		rend:     rend,
 		dispatch: dispatch,
+		funcDefs: make(map[string]*FuncDef),
+		compDefs: make(map[string]*protocol.DefineComponent),
 	}
 }
 
@@ -68,6 +72,18 @@ func (s *Session) HandleMessage(msg *protocol.Message) {
 		ll := msg.Body.(protocol.LoadLibrary)
 		s.handleLoadLibrary(ll)
 
+	case protocol.MsgDefineFunction:
+		df := msg.Body.(protocol.DefineFunction)
+		s.handleDefineFunction(df)
+
+	case protocol.MsgDefineComponent:
+		dc := msg.Body.(protocol.DefineComponent)
+		s.handleDefineComponent(dc)
+
+	case protocol.MsgInclude:
+		// Include is handled by the transport layer, not the session.
+		return
+
 	case protocol.MsgSetTheme:
 		// Phase 3: theme support
 		log.Printf("session: setTheme not yet implemented")
@@ -89,6 +105,8 @@ func (s *Session) createSurface(cs protocol.CreateSurface) {
 
 	surf := NewSurface(cs.SurfaceID, s.rend, s.dispatch, s.ffi, s.assets)
 	surf.ActionHandler = s.OnAction
+	surf.SetFuncDefs(s.funcDefs)
+	surf.SetCompDefs(s.compDefs)
 	s.surfaces[cs.SurfaceID] = surf
 
 	width := cs.Width
@@ -150,6 +168,33 @@ func (s *Session) handleLoadLibrary(ll protocol.LoadLibrary) {
 	// Propagate FFI registry to all existing surfaces
 	for _, surf := range s.surfaces {
 		surf.SetFFI(s.ffi)
+	}
+}
+
+func (s *Session) handleDefineFunction(df protocol.DefineFunction) {
+	if _, exists := s.funcDefs[df.Name]; exists {
+		log.Printf("session: redefining function %s", df.Name)
+	}
+	def := &FuncDef{
+		Name:   df.Name,
+		Params: df.Params,
+		Body:   df.Body,
+	}
+	s.funcDefs[df.Name] = def
+	// Propagate to all existing surfaces
+	for _, surf := range s.surfaces {
+		surf.SetFuncDefs(s.funcDefs)
+	}
+}
+
+func (s *Session) handleDefineComponent(dc protocol.DefineComponent) {
+	if _, exists := s.compDefs[dc.Name]; exists {
+		log.Printf("session: redefining component %s", dc.Name)
+	}
+	s.compDefs[dc.Name] = &dc
+	// Propagate to all existing surfaces
+	for _, surf := range s.surfaces {
+		surf.SetCompDefs(s.compDefs)
 	}
 }
 

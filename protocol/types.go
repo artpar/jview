@@ -14,6 +14,9 @@ const (
 	MsgTest             MessageType = "test"
 	MsgLoadLibrary      MessageType = "loadLibrary"
 	MsgLoadAssets       MessageType = "loadAssets"
+	MsgDefineFunction   MessageType = "defineFunction"
+	MsgDefineComponent  MessageType = "defineComponent"
+	MsgInclude          MessageType = "include"
 )
 
 // TestMessage defines a test case with a sequence of assert/simulate steps.
@@ -155,4 +158,26 @@ type LoadLibraryFunc struct {
 	ReturnType string   `json:"returnType,omitempty"`
 	ParamTypes []string `json:"paramTypes,omitempty"`
 	FixedArgs  int      `json:"fixedArgs,omitempty"`
+}
+
+// DefineFunction registers a reusable function with parametric body.
+type DefineFunction struct {
+	Type   MessageType `json:"type"`
+	Name   string      `json:"name"`
+	Params []string    `json:"params"`
+	Body   interface{} `json:"body"`
+}
+
+// DefineComponent registers a reusable component template with parameters.
+type DefineComponent struct {
+	Type       MessageType       `json:"type"`
+	Name       string            `json:"name"`
+	Params     []string          `json:"params"`
+	Components []json.RawMessage `json:"components"`
+}
+
+// Include directs the transport to inline another JSONL file.
+type Include struct {
+	Type MessageType `json:"type"`
+	Path string      `json:"path"`
 }
