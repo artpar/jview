@@ -324,6 +324,208 @@ func TestLLMTransportSendActionTriggersNewTurn(t *testing.T) {
 	}
 }
 
+func TestToolCallToMessageLoadLibrary(t *testing.T) {
+	args := map[string]interface{}{
+		"path":   "/tmp/mylib.dylib",
+		"prefix": "mylib",
+		"functions": []interface{}{
+			map[string]interface{}{"name": "add", "symbol": "mylib_add", "returnType": "double", "paramTypes": []string{"double", "double"}},
+			map[string]interface{}{"name": "reverse", "symbol": "mylib_reverse", "returnType": "string", "paramTypes": []string{"string"}},
+		},
+	}
+	argsJSON, _ := json.Marshal(args)
+
+	tc := anyllm.ToolCall{
+		ID:   "call_ll",
+		Type: "function",
+		Function: anyllm.FunctionCall{
+			Name:      "a2ui_loadLibrary",
+			Arguments: string(argsJSON),
+		},
+	}
+
+	msg, rawBytes, err := toolCallToMessage(tc)
+	if err != nil {
+		t.Fatalf("toolCallToMessage: %v", err)
+	}
+	if msg.Type != protocol.MsgLoadLibrary {
+		t.Errorf("expected loadLibrary, got %s", msg.Type)
+	}
+	ll, ok := msg.Body.(protocol.LoadLibrary)
+	if !ok {
+		t.Fatalf("expected LoadLibrary body, got %T", msg.Body)
+	}
+	if ll.Path != "/tmp/mylib.dylib" {
+		t.Errorf("expected path /tmp/mylib.dylib, got %s", ll.Path)
+	}
+	if ll.Prefix != "mylib" {
+		t.Errorf("expected prefix mylib, got %s", ll.Prefix)
+	}
+	if len(ll.Functions) != 2 {
+		t.Fatalf("expected 2 functions, got %d", len(ll.Functions))
+	}
+	if ll.Functions[0].Name != "add" || ll.Functions[0].Symbol != "mylib_add" {
+		t.Errorf("func[0] = %+v, want {add, mylib_add}", ll.Functions[0])
+	}
+	if ll.Functions[0].ReturnType != "double" {
+		t.Errorf("func[0] returnType = %q, want double", ll.Functions[0].ReturnType)
+	}
+	if rawBytes == nil {
+		t.Error("expected non-nil raw bytes for recording")
+	}
+}
+
+func TestLLMTransportInspectLibrary(t *testing.T) {
+	// Test that inspectLibrary tool calls are handled as utility (not protocol messages)
+	mock := &mockProvider{
+		name: "mock",
+		responses: []anyllm.ChatCompletion{
+			// LLM calls inspectLibrary, then loadLibrary, then createSurface
+			{
+				Choices: []anyllm.Choice{{
+					FinishReason: anyllm.FinishReasonToolCalls,
+					Message: anyllm.Message{
+						Role: anyllm.RoleAssistant,
+						ToolCalls: []anyllm.ToolCall{
+							{
+								ID:   "call_inspect",
+								Type: "function",
+								Function: anyllm.FunctionCall{
+									Name:      "a2ui_inspectLibrary",
+									Arguments: `{"path":"/nonexistent/lib.dylib"}`,
+								},
+							},
+						},
+					},
+				}},
+			},
+			// After getting inspect result, LLM creates surface
+			{
+				Choices: []anyllm.Choice{{
+					FinishReason: anyllm.FinishReasonToolCalls,
+					Message: anyllm.Message{
+						Role: anyllm.RoleAssistant,
+						ToolCalls: []anyllm.ToolCall{
+							{
+								ID:   "call_cs",
+								Type: "function",
+								Function: anyllm.FunctionCall{
+									Name:      "a2ui_createSurface",
+									Arguments: `{"surfaceId":"s1","title":"Test"}`,
+								},
+							},
+						},
+					},
+				}},
+			},
+			{
+				Choices: []anyllm.Choice{{
+					FinishReason: anyllm.FinishReasonStop,
+					Message:      anyllm.Message{Role: anyllm.RoleAssistant, Content: "done"},
+				}},
+			},
+		},
+	}
+
+	tr := NewLLMTransport(LLMConfig{
+		Provider: mock,
+		Model:    "test-model",
+		Prompt:   "Load a lib",
+		Mode:     "tools",
+	})
+	tr.Start()
+
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+
+	// inspectLibrary should NOT produce a protocol message — only createSurface should come through
+	select {
+	case msg, ok := <-tr.Messages():
+		if !ok {
+			t.Fatal("messages closed")
+		}
+		if msg.Type != protocol.MsgCreateSurface {
+			t.Errorf("expected createSurface (inspectLibrary should not produce a message), got %s", msg.Type)
+		}
+	case <-timer.C:
+		t.Fatal("timeout waiting for message")
+	}
+
+	tr.Stop()
+	for range tr.Messages() {
+	}
+}
+
+func TestLLMTransportLoadLibraryToolCall(t *testing.T) {
+	// Test that loadLibrary tool calls produce a protocol message
+	mock := &mockProvider{
+		name: "mock",
+		responses: []anyllm.ChatCompletion{
+			{
+				Choices: []anyllm.Choice{{
+					FinishReason: anyllm.FinishReasonToolCalls,
+					Message: anyllm.Message{
+						Role: anyllm.RoleAssistant,
+						ToolCalls: []anyllm.ToolCall{
+							{
+								ID:   "call_ll",
+								Type: "function",
+								Function: anyllm.FunctionCall{
+									Name:      "a2ui_loadLibrary",
+									Arguments: `{"path":"/tmp/test.dylib","prefix":"test","functions":[{"name":"add","symbol":"test_add","returnType":"double","paramTypes":["double","double"]}]}`,
+								},
+							},
+						},
+					},
+				}},
+			},
+			{
+				Choices: []anyllm.Choice{{
+					FinishReason: anyllm.FinishReasonStop,
+					Message:      anyllm.Message{Role: anyllm.RoleAssistant, Content: "done"},
+				}},
+			},
+		},
+	}
+
+	tr := NewLLMTransport(LLMConfig{
+		Provider: mock,
+		Model:    "test-model",
+		Prompt:   "Load a lib",
+		Mode:     "tools",
+	})
+	tr.Start()
+
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+
+	select {
+	case msg, ok := <-tr.Messages():
+		if !ok {
+			t.Fatal("messages closed")
+		}
+		if msg.Type != protocol.MsgLoadLibrary {
+			t.Errorf("expected loadLibrary, got %s", msg.Type)
+		}
+		ll := msg.Body.(protocol.LoadLibrary)
+		if ll.Path != "/tmp/test.dylib" {
+			t.Errorf("path = %q, want /tmp/test.dylib", ll.Path)
+		}
+		if ll.Prefix != "test" {
+			t.Errorf("prefix = %q, want test", ll.Prefix)
+		}
+		if len(ll.Functions) != 1 || ll.Functions[0].Name != "add" {
+			t.Errorf("functions = %+v, want [{add test_add}]", ll.Functions)
+		}
+	case <-timer.C:
+		t.Fatal("timeout waiting for message")
+	}
+
+	tr.Stop()
+	for range tr.Messages() {
+	}
+}
+
 // countingMockProvider wraps mockProvider to count turns.
 type countingMockProvider struct {
 	mockProvider *mockProvider

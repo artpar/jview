@@ -18,11 +18,13 @@ type LibConfig struct {
 	Functions []FuncConfig `json:"functions"`
 }
 
-// FuncConfig declares a single native function's evaluation-level signature.
-// The actual C call is always: const char* symbol(const char* json_args)
+// FuncConfig declares a native function with its C type signature for libffi.
 type FuncConfig struct {
-	Name   string `json:"name"`
-	Symbol string `json:"symbol"`
+	Name       string   `json:"name"`
+	Symbol     string   `json:"symbol"`
+	ReturnType string   `json:"returnType,omitempty"`
+	ParamTypes []string `json:"paramTypes,omitempty"`
+	FixedArgs  int      `json:"fixedArgs,omitempty"`
 }
 
 // LoadFFIConfig reads and parses an FFI convention file.

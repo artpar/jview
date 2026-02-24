@@ -210,6 +210,18 @@ func (t *LLMTransport) doTurnTools(ctx context.Context, history []anyllm.Message
 		if len(choice.Message.ToolCalls) > 0 {
 			for _, tc := range choice.Message.ToolCalls {
 				log.Printf("llm: processing tool call: %s", tc.Function.Name)
+
+				// Handle utility tools that return data to the LLM (not protocol messages)
+				if tc.Function.Name == "a2ui_inspectLibrary" {
+					result := handleInspectLibrary(tc)
+					history = append(history, anyllm.Message{
+						Role:       anyllm.RoleTool,
+						Content:    result,
+						ToolCallID: tc.ID,
+					})
+					continue
+				}
+
 				msg, rawBytes, err := toolCallToMessage(tc)
 				if err != nil {
 					log.Printf("llm: tool call parse error: %v", err)

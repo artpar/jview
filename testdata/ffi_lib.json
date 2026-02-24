@@ -6,15 +6,57 @@
       "functions": [
         {
           "name": "add",
-          "symbol": "math_add"
+          "symbol": "math_add",
+          "returnType": "double",
+          "paramTypes": ["double", "double"]
         },
         {
           "name": "reverse",
-          "symbol": "string_reverse"
+          "symbol": "string_reverse",
+          "returnType": "string",
+          "paramTypes": ["string"]
+        },
+        {
+          "name": "strlen",
+          "symbol": "string_length",
+          "returnType": "int",
+          "paramTypes": ["string"]
+        },
+        {
+          "name": "upper",
+          "symbol": "string_upper",
+          "returnType": "string",
+          "paramTypes": ["string"]
         },
         {
           "name": "echo",
-          "symbol": "echo"
+          "symbol": "echo",
+          "returnType": "string",
+          "paramTypes": ["string"]
+        },
+        {
+          "name": "alloc",
+          "symbol": "alloc_buffer",
+          "returnType": "pointer",
+          "paramTypes": ["int"]
+        },
+        {
+          "name": "free",
+          "symbol": "free_buffer",
+          "returnType": "void",
+          "paramTypes": ["pointer"]
+        },
+        {
+          "name": "intadd",
+          "symbol": "int_add",
+          "returnType": "int",
+          "paramTypes": ["int", "int"]
+        },
+        {
+          "name": "floatadd",
+          "symbol": "float_add",
+          "returnType": "float",
+          "paramTypes": ["float", "float"]
         }
       ]
     }

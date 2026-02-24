@@ -59,6 +59,10 @@ func (s *Session) HandleMessage(msg *protocol.Message) {
 		}
 		surf.HandleUpdateDataModel(udm)
 
+	case protocol.MsgLoadLibrary:
+		ll := msg.Body.(protocol.LoadLibrary)
+		s.handleLoadLibrary(ll)
+
 	case protocol.MsgSetTheme:
 		// Phase 3: theme support
 		log.Printf("session: setTheme not yet implemented")
@@ -113,4 +117,33 @@ func (s *Session) deleteSurface(surfaceID string) {
 	s.dispatch.RunOnMain(func() {
 		s.rend.DestroyWindow(surfaceID)
 	})
+}
+
+func (s *Session) handleLoadLibrary(ll protocol.LoadLibrary) {
+	// Lazy-init FFI registry
+	if s.ffi == nil {
+		s.ffi = NewFFIRegistry()
+	}
+
+	// Convert protocol types to engine types
+	funcs := make([]FuncConfig, len(ll.Functions))
+	for i, f := range ll.Functions {
+		funcs[i] = FuncConfig{
+			Name:       f.Name,
+			Symbol:     f.Symbol,
+			ReturnType: f.ReturnType,
+			ParamTypes: f.ParamTypes,
+			FixedArgs:  f.FixedArgs,
+		}
+	}
+
+	if err := s.ffi.LoadLibrary(ll.Path, ll.Prefix, funcs); err != nil {
+		log.Printf("session: loadLibrary error: %v", err)
+		return
+	}
+
+	// Propagate FFI registry to all existing surfaces
+	for _, surf := range s.surfaces {
+		surf.SetFFI(s.ffi)
+	}
 }

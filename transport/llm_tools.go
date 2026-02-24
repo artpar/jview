@@ -4,13 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"jview/protocol"
+	"os/exec"
+	"runtime"
 	"sort"
 	"strings"
 
 	anyllm "github.com/mozilla-ai/any-llm-go"
 )
 
-// a2uiTools returns the 5 A2UI tool definitions for the LLM.
+// a2uiTools returns the A2UI tool definitions for the LLM.
 func a2uiTools() []anyllm.Tool {
 	return []anyllm.Tool{
 		{
@@ -164,6 +166,49 @@ func a2uiTools() []anyllm.Tool {
 						},
 					},
 					"required": []string{"surfaceId", "name", "steps"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: anyllm.Function{
+				Name:        "a2ui_loadLibrary",
+				Description: "Load a native dynamic library (.dylib/.so/.dll) and register its functions for use in component expressions via functionCall. Functions are called with their actual C signatures via libffi — no wrappers needed. Declare each function's return type and parameter types.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path":   map[string]any{"type": "string", "description": "Absolute path to the dynamic library file"},
+						"prefix": map[string]any{"type": "string", "description": "Namespace prefix for registered functions (e.g. 'curl' → callable as curl.init)"},
+						"functions": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"name":       map[string]any{"type": "string", "description": "Function name used in expressions (e.g. 'init')"},
+									"symbol":     map[string]any{"type": "string", "description": "Exported C symbol name in the library (e.g. 'curl_easy_init')"},
+									"returnType": map[string]any{"type": "string", "enum": []string{"void", "int", "uint32", "int64", "uint64", "float", "double", "pointer", "string", "bool"}, "description": "C return type"},
+									"paramTypes": map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"int", "uint32", "int64", "uint64", "float", "double", "pointer", "string", "bool"}}, "description": "C parameter types in order"},
+									"fixedArgs":  map[string]any{"type": "integer", "description": "For variadic functions: number of fixed args before the variadic part"},
+								},
+								"required": []string{"name", "symbol", "returnType", "paramTypes"},
+							},
+						},
+					},
+					"required": []string{"path", "prefix", "functions"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: anyllm.Function{
+				Name:        "a2ui_inspectLibrary",
+				Description: "Inspect a native dynamic library to discover its exported symbols. Returns a list of exported function symbols that can be used with a2ui_loadLibrary. Any exported C function can be called — declare its return type and parameter types when loading.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{"type": "string", "description": "Absolute path to the dynamic library file (.dylib/.so/.dll)"},
+					},
+					"required": []string{"path"},
 				},
 			},
 		},
@@ -379,6 +424,29 @@ Surface-level styling:
 
 Layout tip: use justify:"fillEqually" on Row/Column to make all children equal-width/height.
 
+NATIVE LIBRARIES (FFI):
+You can load ANY native dynamic library at runtime and call its functions directly with their real C signatures — no wrappers needed.
+
+1. Use a2ui_inspectLibrary to discover exported symbols in a .dylib/.so/.dll file
+2. Use a2ui_loadLibrary to load the library, declaring each function's return type and parameter types
+3. Use the registered functions in component props via functionCall: {"functionCall": {"name": "prefix.funcName", "args": [...]}}
+
+Supported types: void, int, uint32, int64, uint64, float, double, pointer, string, bool
+
+Type mapping:
+- Numbers in JSON map to the declared C type (int→int32, double→double, etc.)
+- Strings in JSON map to const char*
+- Booleans in JSON map to int (0/1)
+- Pointer returns give you a handle ID (a number). Pass that handle ID back to functions expecting a pointer arg.
+- For variadic C functions (like printf), set fixedArgs to the number of fixed parameters before the ... part.
+
+Example — calling libcurl:
+{"type":"loadLibrary","path":"/usr/lib/libcurl.dylib","prefix":"curl","functions":[
+  {"name":"init","symbol":"curl_easy_init","returnType":"pointer","paramTypes":[]},
+  {"name":"perform","symbol":"curl_easy_perform","returnType":"int","paramTypes":["pointer"]},
+  {"name":"cleanup","symbol":"curl_easy_cleanup","returnType":"void","paramTypes":["pointer"]}
+]}
+
 WORKFLOW:
 1. Call a2ui_createSurface to create a window (optionally with backgroundColor and padding)
 2. Call a2ui_updateDataModel to set initial data (if needed)
@@ -414,4 +482,53 @@ Simulation:
 Tests execute in file order. Side effects persist across tests. Actions reset per test.
 
 USER REQUEST: ` + userPrompt
+}
+
+// handleInspectLibrary runs nm on a dylib and returns its exported symbols as a JSON string.
+func handleInspectLibrary(tc anyllm.ToolCall) string {
+	var args struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+		return fmt.Sprintf("error: invalid arguments: %v", err)
+	}
+	if args.Path == "" {
+		return "error: path is required"
+	}
+
+	// Use platform-appropriate tool to list exported symbols
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("nm", "-gU", args.Path)
+	default:
+		cmd = exec.Command("nm", "-D", "--defined-only", args.Path)
+	}
+
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Sprintf("error: failed to inspect library: %v", err)
+	}
+
+	// Parse nm output: each line is "address type name"
+	var symbols []string
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		sym := fields[2]
+		// Strip leading underscore on macOS
+		if runtime.GOOS == "darwin" && strings.HasPrefix(sym, "_") {
+			sym = sym[1:]
+		}
+		symbols = append(symbols, sym)
+	}
+
+	result, _ := json.Marshal(map[string]any{
+		"path":    args.Path,
+		"symbols": symbols,
+		"count":   len(symbols),
+	})
+	return string(result)
 }

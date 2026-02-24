@@ -294,6 +294,44 @@ func TestParseCreateSurfaceWithStyle(t *testing.T) {
 	}
 }
 
+func TestParseLoadLibrary(t *testing.T) {
+	input := `{"type":"loadLibrary","path":"/usr/local/lib/mylib.dylib","prefix":"mylib","functions":[{"name":"add","symbol":"mylib_add","returnType":"double","paramTypes":["double","double"]},{"name":"reverse","symbol":"mylib_reverse","returnType":"string","paramTypes":["string"],"fixedArgs":0}]}`
+	p := NewParser(strings.NewReader(input))
+
+	msg, err := p.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Type != MsgLoadLibrary {
+		t.Fatalf("expected loadLibrary, got %s", msg.Type)
+	}
+	ll := msg.Body.(LoadLibrary)
+	if ll.Path != "/usr/local/lib/mylib.dylib" {
+		t.Errorf("path = %q, want /usr/local/lib/mylib.dylib", ll.Path)
+	}
+	if ll.Prefix != "mylib" {
+		t.Errorf("prefix = %q, want mylib", ll.Prefix)
+	}
+	if len(ll.Functions) != 2 {
+		t.Fatalf("got %d functions, want 2", len(ll.Functions))
+	}
+	if ll.Functions[0].Name != "add" || ll.Functions[0].Symbol != "mylib_add" {
+		t.Errorf("func 0 = %+v, want {add, mylib_add}", ll.Functions[0])
+	}
+	if ll.Functions[0].ReturnType != "double" {
+		t.Errorf("func 0 returnType = %q, want double", ll.Functions[0].ReturnType)
+	}
+	if len(ll.Functions[0].ParamTypes) != 2 || ll.Functions[0].ParamTypes[0] != "double" {
+		t.Errorf("func 0 paramTypes = %v, want [double, double]", ll.Functions[0].ParamTypes)
+	}
+	if ll.Functions[1].Name != "reverse" || ll.Functions[1].Symbol != "mylib_reverse" {
+		t.Errorf("func 1 = %+v, want {reverse, mylib_reverse}", ll.Functions[1])
+	}
+	if ll.Functions[1].ReturnType != "string" {
+		t.Errorf("func 1 returnType = %q, want string", ll.Functions[1].ReturnType)
+	}
+}
+
 func TestParseChildListTemplate(t *testing.T) {
 	input := `{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"list1","type":"Column","children":{"forEach":"/items","templateId":"item_tmpl","itemVariable":"item"}}]}`
 	p := NewParser(strings.NewReader(input))

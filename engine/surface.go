@@ -49,6 +49,12 @@ func NewSurface(id string, rend renderer.Renderer, dispatch renderer.Dispatcher,
 	}
 }
 
+// SetFFI updates the FFI registry for this surface and its evaluator.
+func (s *Surface) SetFFI(ffi *FFIRegistry) {
+	s.ffi = ffi
+	s.resolver.evaluator.FFI = ffi
+}
+
 // HandleUpdateComponents processes a batch of component definitions.
 func (s *Surface) HandleUpdateComponents(msg protocol.UpdateComponents) {
 	expanded := s.expandTemplates(msg.Components)

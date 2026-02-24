@@ -12,6 +12,7 @@ const (
 	MsgUpdateDataModel  MessageType = "updateDataModel"
 	MsgSetTheme         MessageType = "setTheme"
 	MsgTest             MessageType = "test"
+	MsgLoadLibrary      MessageType = "loadLibrary"
 )
 
 // TestMessage defines a test case with a sequence of assert/simulate steps.
@@ -123,4 +124,21 @@ type SetTheme struct {
 	Type      MessageType `json:"type"`
 	SurfaceID string      `json:"surfaceId"`
 	Theme     string      `json:"theme"` // "light", "dark", "system"
+}
+
+// LoadLibrary dynamically loads a native library and registers its functions.
+type LoadLibrary struct {
+	Type      MessageType       `json:"type"`
+	Path      string            `json:"path"`
+	Prefix    string            `json:"prefix"`
+	Functions []LoadLibraryFunc `json:"functions"`
+}
+
+// LoadLibraryFunc declares a single function to load from a native library.
+type LoadLibraryFunc struct {
+	Name       string   `json:"name"`
+	Symbol     string   `json:"symbol"`
+	ReturnType string   `json:"returnType,omitempty"`
+	ParamTypes []string `json:"paramTypes,omitempty"`
+	FixedArgs  int      `json:"fixedArgs,omitempty"`
 }

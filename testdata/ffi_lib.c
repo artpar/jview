@@ -1,61 +1,60 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
-// Simple JSON parser helpers — just enough for test args.
-// All functions follow the uniform signature: const char* fn(const char* json_args)
-// Input: JSON array of arguments.  Output: JSON value.  Caller frees result with free().
+// Proper native C functions with real signatures — no JSON wrappers needed.
+// libffi calls these directly with the correct C types.
 
-// math_add: adds two numbers from a JSON array [a, b] → returns the sum as JSON number.
-const char* math_add(const char* json_args) {
-    double a = 0, b = 0;
-    // Parse "[a, b]" — skip '[', read two numbers separated by ','
-    sscanf(json_args, "[%lf,%lf]", &a, &b);
-    double result = a + b;
-
-    char* buf = (char*)malloc(64);
-    // Format as integer if whole, else as decimal
-    if (result == (long long)result) {
-        snprintf(buf, 64, "%lld", (long long)result);
-    } else {
-        snprintf(buf, 64, "%g", result);
-    }
-    return buf;
+double math_add(double a, double b) {
+    return a + b;
 }
 
-// string_reverse: reverses a JSON string from ["hello"] → "olleh"
-const char* string_reverse(const char* json_args) {
-    // Find the first quoted string in the array
-    const char* start = strchr(json_args, '"');
-    if (!start) {
-        char* err = (char*)malloc(8);
-        snprintf(err, 8, "\"\"");
-        return err;
-    }
-    start++; // skip opening quote
-    const char* end = strchr(start, '"');
-    if (!end) {
-        char* err = (char*)malloc(8);
-        snprintf(err, 8, "\"\"");
-        return err;
-    }
+int string_length(const char *s) {
+    return (int)strlen(s);
+}
 
-    size_t len = end - start;
-    // Result: "reversed_string" — need len + 2 quotes + null
-    char* buf = (char*)malloc(len + 3);
-    buf[0] = '"';
+// Returns a pointer to a static buffer (caller must NOT free).
+const char* string_reverse(const char *s) {
+    static char buf[4096];
+    size_t len = strlen(s);
+    if (len >= sizeof(buf)) len = sizeof(buf) - 1;
     for (size_t i = 0; i < len; i++) {
-        buf[1 + i] = start[len - 1 - i];
+        buf[i] = s[len - 1 - i];
     }
-    buf[len + 1] = '"';
-    buf[len + 2] = '\0';
+    buf[len] = '\0';
     return buf;
 }
 
-// echo: returns the args array as-is (identity function for testing).
-const char* echo(const char* json_args) {
-    size_t len = strlen(json_args);
-    char* buf = (char*)malloc(len + 1);
-    memcpy(buf, json_args, len + 1);
+// Returns a pointer to a static buffer (caller must NOT free).
+const char* string_upper(const char *s) {
+    static char buf[4096];
+    size_t len = strlen(s);
+    if (len >= sizeof(buf)) len = sizeof(buf) - 1;
+    for (size_t i = 0; i < len; i++) {
+        buf[i] = (char)toupper((unsigned char)s[i]);
+    }
+    buf[len] = '\0';
     return buf;
+}
+
+// echo: returns the input string as-is (identity function for testing).
+const char* echo(const char *s) {
+    return s;
+}
+
+void* alloc_buffer(int size) {
+    return malloc((size_t)size);
+}
+
+void free_buffer(void *ptr) {
+    free(ptr);
+}
+
+int int_add(int a, int b) {
+    return a + b;
+}
+
+float float_add(float a, float b) {
+    return a + b;
 }
