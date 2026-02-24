@@ -1111,3 +1111,7 @@ func TestE2ECalculatorV2Tests(t *testing.T) {
 	runSampleAppTests(t, "sample_apps/calculator/prompt.jsonl")
 }
 
+func TestE2EChannelDemoTests(t *testing.T) {
+	runSampleAppTests(t, "sample_apps/channel_demo/prompt.jsonl")
+}
+
