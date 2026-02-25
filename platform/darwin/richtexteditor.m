@@ -253,6 +253,36 @@ static NSString* attributedStringToMarkdown(NSAttributedString *attrStr) {
 
 @end
 
+// --- Checklist insertion via responder chain ---
+
+@interface NSTextView (JVChecklist)
+- (void)insertChecklistItem:(id)sender;
+@end
+
+@implementation NSTextView (JVChecklist)
+- (void)insertChecklistItem:(id)sender {
+    NSRange sel = self.selectedRange;
+    NSString *text = self.string;
+
+    // Find start of current line
+    NSUInteger lineStart = sel.location;
+    while (lineStart > 0 && [text characterAtIndex:lineStart - 1] != '\n') {
+        lineStart--;
+    }
+
+    // Check if current line already has a checklist prefix
+    NSString *lineFromStart = [text substringFromIndex:lineStart];
+    if ([lineFromStart hasPrefix:@"\u2610 "] || [lineFromStart hasPrefix:@"\u2611 "]) {
+        // Remove the checklist prefix
+        [self setSelectedRange:NSMakeRange(lineStart, 2)];
+        [self insertText:@"" replacementRange:NSMakeRange(lineStart, 2)];
+    } else {
+        // Insert checklist prefix at line start
+        [self insertText:@"\u2610 " replacementRange:NSMakeRange(lineStart, 0)];
+    }
+}
+@end
+
 // --- C API ---
 
 void* JVCreateRichTextEditor(const char* content, bool editable, uint64_t callbackID) {

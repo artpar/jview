@@ -94,8 +94,9 @@ type ResolvedProps struct {
 	Muted    bool `json:"muted,omitempty"`
 
 	// SplitView
-	DividerStyle string `json:"dividerStyle,omitempty"`
-	Vertical     bool   `json:"vertical,omitempty"`
+	DividerStyle  string `json:"dividerStyle,omitempty"`
+	Vertical      bool   `json:"vertical,omitempty"`
+	CollapsedPane int    `json:"collapsedPane,omitempty"`
 
 	// SearchField (reuses Placeholder, Value, DataBinding)
 

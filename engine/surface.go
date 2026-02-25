@@ -272,12 +272,15 @@ func (s *Surface) HandleUpdateToolbar(msg protocol.UpdateToolbar) {
 		if item.SearchField && item.DataBinding != "" {
 			binding := item.DataBinding
 			cbID := s.rend.RegisterCallback(s.id, "__toolbar_search_"+item.ID, "change", func(value string) {
+				jlog.Infof("search", s.id, "search callback: binding=%s value=%q", binding, value)
 				changed, err := s.dm.Set(binding, value)
 				if err != nil {
 					logWarn("binding", s.id, fmt.Sprintf("toolbar search binding error: %v", err))
 					return
 				}
+				jlog.Infof("search", s.id, "search changed paths: %v", changed)
 				affected := s.tracker.Affected(changed)
+				jlog.Infof("search", s.id, "search affected components: %v", affected)
 				if len(affected) > 0 {
 					s.renderComponents(affected)
 				}

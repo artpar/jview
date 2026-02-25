@@ -175,6 +175,11 @@ func (r *Resolver) Resolve(comp *protocol.Component) *renderer.RenderNode {
 			p.DividerStyle = "thin"
 		}
 		p.Vertical = r.resolveBoolDefault(comp.ComponentID, cp.Vertical, true)
+		if cp.CollapsedPane != nil {
+			p.CollapsedPane = int(r.resolveNumber(comp.ComponentID, cp.CollapsedPane))
+		} else {
+			p.CollapsedPane = -1
+		}
 
 	case protocol.CompSearchField:
 		p.Placeholder = r.resolveString(comp.ComponentID, cp.Placeholder)

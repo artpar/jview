@@ -1,17 +1,33 @@
 #import <Cocoa/Cocoa.h>
+#import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
 #include "splitview.h"
 
 static const void *kSplitViewDelegateKey = &kSplitViewDelegateKey;
-
 static const void *kSplitViewInitializedKey = &kSplitViewInitializedKey;
+static const void *kCollapsedPaneKey = &kCollapsedPaneKey;
 
 @interface JVSplitViewDelegate : NSObject <NSSplitViewDelegate>
 @end
 
 @implementation JVSplitViewDelegate
 
+- (BOOL)splitView:(NSSplitView *)splitView canCollapseSubview:(NSView *)subview {
+    // Allow programmatic collapse of any pane
+    NSNumber *collapsed = objc_getAssociatedObject(splitView, kCollapsedPaneKey);
+    if (collapsed && [collapsed intValue] >= 0) {
+        NSInteger idx = [splitView.subviews indexOfObject:subview];
+        if (idx == (NSUInteger)[collapsed intValue]) return YES;
+    }
+    return NO;
+}
+
 - (CGFloat)splitView:(NSSplitView *)splitView constrainMinCoordinate:(CGFloat)proposedMinimumPosition ofSubviewAt:(NSInteger)dividerIndex {
+    // Allow position 0 when collapsing pane at dividerIndex
+    NSNumber *collapsed = objc_getAssociatedObject(splitView, kCollapsedPaneKey);
+    if (collapsed && [collapsed intValue] == (int)dividerIndex) {
+        return proposedMinimumPosition;
+    }
     return proposedMinimumPosition + 100;
 }
 
@@ -102,7 +118,10 @@ void* JVCreateSplitView(const char* dividerStyle, bool vertical) {
     return (__bridge_retained void*)splitView;
 }
 
-void JVUpdateSplitView(void* handle, const char* dividerStyle, bool vertical) {
+static const void *kSavedDiv0Key = &kSavedDiv0Key;
+static const void *kSavedDiv1Key = &kSavedDiv1Key;
+
+void JVUpdateSplitView(void* handle, const char* dividerStyle, bool vertical, int collapsedPane) {
     NSSplitView *splitView = (__bridge NSSplitView*)handle;
     splitView.vertical = vertical;
 
@@ -114,13 +133,87 @@ void JVUpdateSplitView(void* handle, const char* dividerStyle, bool vertical) {
     } else {
         splitView.dividerStyle = NSSplitViewDividerStyleThin;
     }
+
+    // Handle pane collapse
+    NSNumber *prevCollapsed = objc_getAssociatedObject(splitView, kCollapsedPaneKey);
+    int prevPane = prevCollapsed ? [prevCollapsed intValue] : -1;
+    NSInteger paneCount = splitView.subviews.count;
+    if (collapsedPane != prevPane && paneCount > 0) {
+        objc_setAssociatedObject(splitView, kCollapsedPaneKey, @(collapsedPane), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+        if (collapsedPane == 0 && paneCount >= 2) {
+            // Collapse first pane — save divider positions, shift remaining dividers
+            CGFloat div0Pos = splitView.vertical
+                ? NSMaxX(splitView.subviews[0].frame)
+                : NSMaxY(splitView.subviews[0].frame);
+            objc_setAssociatedObject(splitView, kSavedDiv0Key, @(div0Pos), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+            if (paneCount >= 3) {
+                CGFloat div1Pos = splitView.vertical
+                    ? NSMaxX(splitView.subviews[1].frame)
+                    : NSMaxY(splitView.subviews[1].frame);
+                objc_setAssociatedObject(splitView, kSavedDiv1Key, @(div1Pos), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                CGFloat newDiv1 = div1Pos - div0Pos;
+
+                [NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
+                    ctx.duration = 0.2;
+                    ctx.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+                    [splitView.animator setPosition:0 ofDividerAtIndex:0];
+                    [splitView.animator setPosition:newDiv1 ofDividerAtIndex:1];
+                }];
+            } else {
+                [NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
+                    ctx.duration = 0.2;
+                    ctx.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+                    [splitView.animator setPosition:0 ofDividerAtIndex:0];
+                }];
+            }
+        } else if (collapsedPane < 0 && prevPane == 0) {
+            // Restore first pane from saved positions
+            NSNumber *savedDiv0 = objc_getAssociatedObject(splitView, kSavedDiv0Key);
+            CGFloat div0Pos = savedDiv0 ? [savedDiv0 doubleValue] : 200;
+
+            if (paneCount >= 3) {
+                NSNumber *savedDiv1 = objc_getAssociatedObject(splitView, kSavedDiv1Key);
+                CGFloat div1Pos = savedDiv1 ? [savedDiv1 doubleValue] : 450;
+
+                [NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
+                    ctx.duration = 0.2;
+                    ctx.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+                    [splitView.animator setPosition:div0Pos ofDividerAtIndex:0];
+                    [splitView.animator setPosition:div1Pos ofDividerAtIndex:1];
+                }];
+            } else {
+                [NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
+                    ctx.duration = 0.2;
+                    ctx.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+                    [splitView.animator setPosition:div0Pos ofDividerAtIndex:0];
+                }];
+            }
+        }
+    }
 }
 
 void JVSplitViewSetChildren(void* handle, void** children, int count) {
     NSSplitView *splitView = (__bridge NSSplitView*)handle;
 
+    // Skip if children are the same (prevents resetting divider positions on re-render)
+    NSArray<NSView*> *existing = splitView.subviews;
+    if ((int)existing.count == count) {
+        BOOL same = YES;
+        for (int i = 0; i < count; i++) {
+            NSView *child = (__bridge NSView*)children[i];
+            NSView *container = existing[i];
+            if (container.subviews.count == 0 || container.subviews[0] != child) {
+                same = NO;
+                break;
+            }
+        }
+        if (same) return;
+    }
+
     // Remove existing subviews (containers from previous call)
-    NSArray<NSView*> *existing = [splitView.subviews copy];
+    existing = [splitView.subviews copy];
     for (NSView *view in existing) {
         [view removeFromSuperview];
     }

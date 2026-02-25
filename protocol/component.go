@@ -141,8 +141,9 @@ type Props struct {
 	OnDateChange *EventAction  `json:"onDateChange,omitempty"`
 
 	// SplitView
-	DividerStyle string          `json:"dividerStyle,omitempty"` // thin, thick, paneSplitter
-	Vertical     *DynamicBoolean `json:"vertical,omitempty"`     // default true (vertical dividers = horizontal panes)
+	DividerStyle  string          `json:"dividerStyle,omitempty"`  // thin, thick, paneSplitter
+	Vertical      *DynamicBoolean `json:"vertical,omitempty"`      // default true (vertical dividers = horizontal panes)
+	CollapsedPane *DynamicNumber  `json:"collapsedPane,omitempty"` // pane index to collapse (-1 = none)
 
 	// SearchField
 	OnSearch *EventAction `json:"onSearch,omitempty"`

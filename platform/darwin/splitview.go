@@ -2,7 +2,7 @@ package darwin
 
 /*
 #cgo CFLAGS: -x objective-c -fobjc-arc
-#cgo LDFLAGS: -framework Cocoa
+#cgo LDFLAGS: -framework Cocoa -framework QuartzCore
 
 #include <stdlib.h>
 #include "splitview.h"
@@ -25,7 +25,7 @@ func updateSplitView(handle renderer.ViewHandle, node *renderer.RenderNode) {
 	cDividerStyle := C.CString(node.Props.DividerStyle)
 	defer C.free(unsafe.Pointer(cDividerStyle))
 
-	C.JVUpdateSplitView(unsafe.Pointer(handle), cDividerStyle, C.bool(node.Props.Vertical))
+	C.JVUpdateSplitView(unsafe.Pointer(handle), cDividerStyle, C.bool(node.Props.Vertical), C.int(node.Props.CollapsedPane))
 }
 
 func setSplitViewChildren(parentHandle renderer.ViewHandle, childHandles []renderer.ViewHandle) {
