@@ -708,3 +708,168 @@ func TestEvalSliceNonArray(t *testing.T) {
 		t.Fatalf("slice on non-array = %d, want 0", len(r))
 	}
 }
+
+func TestEvalFilter(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{
+		map[string]any{"id": "n1", "folderId": "notes", "title": "Meeting Notes"},
+		map[string]any{"id": "n2", "folderId": "notes", "title": "Shopping List"},
+		map[string]any{"id": "n3", "folderId": "work", "title": "Project Plan"},
+	}
+	result, err := eval.Eval("filter", []any{arr, "folderId", "notes"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok {
+		t.Fatalf("filter returned %T, want []any", result)
+	}
+	if len(r) != 2 {
+		t.Fatalf("filter len = %d, want 2", len(r))
+	}
+	m := r[0].(map[string]any)
+	if m["id"] != "n1" {
+		t.Errorf("filter[0].id = %v, want n1", m["id"])
+	}
+	m = r[1].(map[string]any)
+	if m["id"] != "n2" {
+		t.Errorf("filter[1].id = %v, want n2", m["id"])
+	}
+}
+
+func TestEvalFilterNoMatch(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{
+		map[string]any{"id": "n1", "folderId": "notes"},
+	}
+	result, err := eval.Eval("filter", []any{arr, "folderId", "nonexistent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 0 {
+		t.Fatalf("filter no match len = %d, want 0", len(r))
+	}
+}
+
+func TestEvalFilterEmptyArray(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("filter", []any{[]any{}, "key", "val"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 0 {
+		t.Fatalf("filter empty = %d, want 0", len(r))
+	}
+}
+
+func TestEvalFind(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{
+		map[string]any{"id": "n1", "title": "First"},
+		map[string]any{"id": "n2", "title": "Second"},
+		map[string]any{"id": "n3", "title": "Third"},
+	}
+	result, err := eval.Eval("find", []any{arr, "id", "n2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("find returned %T, want map", result)
+	}
+	if m["title"] != "Second" {
+		t.Errorf("find title = %v, want 'Second'", m["title"])
+	}
+}
+
+func TestEvalFindNoMatch(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{
+		map[string]any{"id": "n1"},
+	}
+	result, err := eval.Eval("find", []any{arr, "id", "missing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != nil {
+		t.Errorf("find no match = %v, want nil", result)
+	}
+}
+
+func TestEvalGetField(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	obj := map[string]any{"name": "Alice", "age": float64(30)}
+	result, err := eval.Eval("getField", []any{obj, "name"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != "Alice" {
+		t.Errorf("getField = %v, want 'Alice'", result)
+	}
+}
+
+func TestEvalGetFieldMissingKey(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	obj := map[string]any{"name": "Alice"}
+	result, err := eval.Eval("getField", []any{obj, "nonexistent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != nil {
+		t.Errorf("getField missing = %v, want nil", result)
+	}
+}
+
+func TestEvalGetFieldOnNonObject(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	result, err := eval.Eval("getField", []any{"not-an-object", "field"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != nil {
+		t.Errorf("getField on string = %v, want nil", result)
+	}
+}
+
+func TestEvalFilterWithPath(t *testing.T) {
+	eval, dm := newTestEvaluator()
+	dm.Set("/notes", []any{
+		map[string]any{"id": "n1", "folderId": "notes"},
+		map[string]any{"id": "n2", "folderId": "work"},
+	})
+	dm.Set("/selectedFolder", "notes")
+	result, err := eval.Eval("filter", []any{
+		map[string]any{"path": "/notes"},
+		"folderId",
+		map[string]any{"path": "/selectedFolder"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := result.([]any)
+	if !ok || len(r) != 1 {
+		t.Fatalf("filter with path = %d, want 1", len(r))
+	}
+}
+
+func TestEvalFindThenGetField(t *testing.T) {
+	eval, _ := newTestEvaluator()
+	arr := []any{
+		map[string]any{"id": "n1", "content": "Hello World"},
+		map[string]any{"id": "n2", "content": "Goodbye"},
+	}
+	// find(arr, "id", "n1") → then getField(result, "content")
+	found, err := eval.Eval("find", []any{arr, "id", "n1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := eval.Eval("getField", []any{found, "content"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content != "Hello World" {
+		t.Errorf("find+getField = %v, want 'Hello World'", content)
+	}
+}

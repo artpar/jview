@@ -44,4 +44,9 @@ var FunctionRegistry = []FuncMeta{
 	{Name: "append", Args: "array, element", Desc: "append element to array", Category: "array"},
 	{Name: "removeLast", Args: "array", Desc: "remove last element from array", Category: "array"},
 	{Name: "slice", Args: "array, start, end?", Desc: "extract sub-array from start to end (exclusive)", Category: "array"},
+	{Name: "filter", Args: "array, key, value", Desc: "return items where item[key] == value", Category: "array"},
+	{Name: "find", Args: "array, key, value", Desc: "return first item where item[key] == value", Category: "array"},
+
+	// Object functions
+	{Name: "getField", Args: "object, fieldName", Desc: "extract a field from an object", Category: "object"},
 }

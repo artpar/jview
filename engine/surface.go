@@ -668,6 +668,81 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 			s.trackCallback(comp.ComponentID, "ended", cbID)
 		}
 
+	case protocol.CompSearchField:
+		if comp.Props.DataBinding != "" {
+			binding := comp.Props.DataBinding
+			compID := comp.ComponentID
+			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "change", func(value string) {
+				changed, err := s.dm.Set(binding, value)
+				if err != nil {
+					logWarn("binding", s.id, fmt.Sprintf("searchfield binding error: %v", err))
+					return
+				}
+				affected := s.tracker.Affected(changed)
+				var toRender []string
+				for _, id := range affected {
+					if id != compID {
+						toRender = append(toRender, id)
+					}
+				}
+				if len(toRender) > 0 {
+					s.renderComponents(toRender)
+				}
+			})
+			node.Callbacks["change"] = cbID
+			s.trackCallback(comp.ComponentID, "change", cbID)
+		}
+
+	case protocol.CompOutlineView:
+		if comp.Props.DataBinding != "" {
+			binding := comp.Props.DataBinding
+			compID := comp.ComponentID
+			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "select", func(value string) {
+				changed, err := s.dm.Set(binding, value)
+				if err != nil {
+					logWarn("binding", s.id, fmt.Sprintf("outlineview binding error: %v", err))
+					return
+				}
+				affected := s.tracker.Affected(changed)
+				var toRender []string
+				for _, id := range affected {
+					if id != compID {
+						toRender = append(toRender, id)
+					}
+				}
+				if len(toRender) > 0 {
+					s.renderComponents(toRender)
+				}
+			})
+			node.Callbacks["select"] = cbID
+			s.trackCallback(comp.ComponentID, "select", cbID)
+		}
+
+	case protocol.CompRichTextEditor:
+		if comp.Props.DataBinding != "" {
+			binding := comp.Props.DataBinding
+			compID := comp.ComponentID
+			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "change", func(value string) {
+				changed, err := s.dm.Set(binding, value)
+				if err != nil {
+					logWarn("binding", s.id, fmt.Sprintf("richtexteditor binding error: %v", err))
+					return
+				}
+				affected := s.tracker.Affected(changed)
+				var toRender []string
+				for _, id := range affected {
+					if id != compID {
+						toRender = append(toRender, id)
+					}
+				}
+				if len(toRender) > 0 {
+					s.renderComponents(toRender)
+				}
+			})
+			node.Callbacks["change"] = cbID
+			s.trackCallback(comp.ComponentID, "change", cbID)
+		}
+
 	case protocol.CompModal:
 		binding := comp.Props.DataBinding
 		compID := comp.ComponentID
@@ -1062,6 +1137,11 @@ func (s *Surface) rewritePaths(comp *protocol.Component, itemVar string, itemPat
 	rewriteBool(p.Loop)
 	rewriteBool(p.Controls)
 	rewriteBool(p.Muted)
+	rewriteBool(p.Vertical)
+	rewriteBool(p.Editable)
+	rewriteString(p.OutlineData)
+	rewriteString(p.SelectedID)
+	rewriteString(p.RichContent)
 
 	// Rewrite data binding
 	if p.DataBinding != "" {
@@ -1090,6 +1170,8 @@ func (s *Surface) rewritePaths(comp *protocol.Component, itemVar string, itemPat
 	rewriteAction(p.OnDateChange)
 	rewriteAction(p.OnDismiss)
 	rewriteAction(p.OnEnded)
+	rewriteAction(p.OnSearch)
+	rewriteAction(p.OnRichChange)
 }
 
 // deepCopyComponent creates a deep copy of a component, including all pointer fields in Props.
@@ -1214,6 +1296,26 @@ func deepCopyComponent(c protocol.Component) protocol.Component {
 		v := *p.Muted
 		p.Muted = &v
 	}
+	if p.Vertical != nil {
+		v := *p.Vertical
+		p.Vertical = &v
+	}
+	if p.OutlineData != nil {
+		v := *p.OutlineData
+		p.OutlineData = &v
+	}
+	if p.SelectedID != nil {
+		v := *p.SelectedID
+		p.SelectedID = &v
+	}
+	if p.RichContent != nil {
+		v := *p.RichContent
+		p.RichContent = &v
+	}
+	if p.Editable != nil {
+		v := *p.Editable
+		p.Editable = &v
+	}
 
 	// Deep copy event actions (contain mutable Args trees)
 	p.OnClick = deepCopyEventAction(p.OnClick)
@@ -1224,6 +1326,8 @@ func deepCopyComponent(c protocol.Component) protocol.Component {
 	p.OnDateChange = deepCopyEventAction(p.OnDateChange)
 	p.OnDismiss = deepCopyEventAction(p.OnDismiss)
 	p.OnEnded = deepCopyEventAction(p.OnEnded)
+	p.OnSearch = deepCopyEventAction(p.OnSearch)
+	p.OnRichChange = deepCopyEventAction(p.OnRichChange)
 
 	// Deep copy children
 	if c.Children != nil {

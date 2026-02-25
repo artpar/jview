@@ -92,6 +92,24 @@ type ResolvedProps struct {
 	Loop     bool `json:"loop,omitempty"`
 	Controls bool `json:"controls,omitempty"`
 	Muted    bool `json:"muted,omitempty"`
+
+	// SplitView
+	DividerStyle string `json:"dividerStyle,omitempty"`
+	Vertical     bool   `json:"vertical,omitempty"`
+
+	// SearchField (reuses Placeholder, Value, DataBinding)
+
+	// OutlineView
+	OutlineData string `json:"outlineData,omitempty"`
+	LabelKey    string `json:"labelKey,omitempty"`
+	ChildrenKey string `json:"childrenKey,omitempty"`
+	IconKey     string `json:"iconKey,omitempty"`
+	IDKey       string `json:"idKey,omitempty"`
+	SelectedID  string `json:"selectedId,omitempty"`
+
+	// RichTextEditor
+	RichContent string `json:"richContent,omitempty"`
+	Editable    bool   `json:"editable,omitempty"`
 }
 
 // OptionItem represents a single option in a ChoicePicker.

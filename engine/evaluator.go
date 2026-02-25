@@ -64,6 +64,9 @@ func init() {
 		"append":      (*Evaluator).fnAppend,
 		"removeLast":  (*Evaluator).fnRemoveLast,
 		"slice":       (*Evaluator).fnSlice,
+		"filter":      (*Evaluator).fnFilter,
+		"find":        (*Evaluator).fnFind,
+		"getField":    (*Evaluator).fnGetField,
 	}
 
 	// Validate: every registry entry has an impl, and vice versa
@@ -614,4 +617,64 @@ func (e *Evaluator) fnSlice(args []any) (any, error) {
 	result := make([]any, len(arr)-si)
 	copy(result, arr[si:])
 	return result, nil
+}
+
+func (e *Evaluator) fnFilter(args []any) (any, error) {
+	if len(args) < 3 {
+		return []any{}, fmt.Errorf("filter requires 3 args (array, key, value)")
+	}
+	arr, ok := args[0].([]any)
+	if !ok {
+		return []any{}, nil
+	}
+	key := toString(args[1])
+	value := toString(args[2])
+	var result []any
+	for _, item := range arr {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if toString(m[key]) == value {
+			result = append(result, item)
+		}
+	}
+	if result == nil {
+		return []any{}, nil
+	}
+	return result, nil
+}
+
+func (e *Evaluator) fnFind(args []any) (any, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("find requires 3 args (array, key, value)")
+	}
+	arr, ok := args[0].([]any)
+	if !ok {
+		return nil, nil
+	}
+	key := toString(args[1])
+	value := toString(args[2])
+	for _, item := range arr {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if toString(m[key]) == value {
+			return item, nil
+		}
+	}
+	return nil, nil
+}
+
+func (e *Evaluator) fnGetField(args []any) (any, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("getField requires 2 args (object, fieldName)")
+	}
+	obj, ok := args[0].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	field := toString(args[1])
+	return obj[field], nil
 }

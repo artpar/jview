@@ -1115,3 +1115,43 @@ func TestE2EChannelDemoTests(t *testing.T) {
 	runSampleAppTests(t, "sample_apps/channel_demo/prompt.jsonl")
 }
 
+func TestE2ESplitViewTests(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	results, err := RunTestFile(filepath.Join(fixtureDir(), "splitview_test.jsonl"), mock, disp)
+	if err != nil {
+		t.Fatalf("RunTestFile: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("no tests found in splitview_test.jsonl")
+	}
+	for _, r := range results {
+		if !r.Passed {
+			t.Errorf("FAIL: %s: %s", r.Name, r.Error)
+		}
+	}
+	t.Logf("%d tests passed", len(results))
+}
+
+func TestE2ESearchFieldTests(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	results, err := RunTestFile(filepath.Join(fixtureDir(), "searchfield_test.jsonl"), mock, disp)
+	if err != nil {
+		t.Fatalf("RunTestFile: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("no tests found in searchfield_test.jsonl")
+	}
+	for _, r := range results {
+		if !r.Passed {
+			t.Errorf("FAIL: %s: %s", r.Name, r.Error)
+		}
+	}
+	t.Logf("%d tests passed", len(results))
+}
+
+func TestE2ENotesAppTests(t *testing.T) {
+	runSampleAppTests(t, "sample_apps/notes/prompt.jsonl")
+}
+

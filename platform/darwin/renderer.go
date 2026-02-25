@@ -112,6 +112,14 @@ func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode)
 		handle = createVideoView(node, surfaceID)
 	case protocol.CompAudioPlayer:
 		handle = createAudioView(node, surfaceID)
+	case protocol.CompSplitView:
+		handle = createSplitView(node)
+	case protocol.CompSearchField:
+		handle = createSearchFieldView(node, surfaceID)
+	case protocol.CompOutlineView:
+		handle = createOutlineView(node, surfaceID)
+	case protocol.CompRichTextEditor:
+		handle = createRichTextEditorView(node, surfaceID)
 	default:
 		jlog.Warnf("darwin", surfaceID, "unsupported component type %s", node.Type)
 		return 0
@@ -168,6 +176,14 @@ func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle
 		updateVideoView(handle, node)
 	case protocol.CompAudioPlayer:
 		updateAudioView(handle, node)
+	case protocol.CompSplitView:
+		updateSplitView(handle, node)
+	case protocol.CompSearchField:
+		updateSearchFieldView(handle, node)
+	case protocol.CompOutlineView:
+		updateOutlineView(handle, node)
+	case protocol.CompRichTextEditor:
+		updateRichTextEditorView(handle, node)
 	default:
 		jlog.Warnf("darwin", surfaceID, "unsupported update for component type %s", node.Type)
 	}
@@ -189,6 +205,8 @@ func (r *DarwinRenderer) SetChildren(surfaceID string, parentHandle renderer.Vie
 		setTabsChildren(parentHandle, childHandles)
 	case protocol.CompModal:
 		setModalChildren(parentHandle, childHandles)
+	case protocol.CompSplitView:
+		setSplitViewChildren(parentHandle, childHandles)
 	default:
 		jlog.Warnf("darwin", surfaceID, "SetChildren not supported for type %s", parentType)
 	}

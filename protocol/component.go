@@ -24,6 +24,10 @@ const (
 	CompDateTimeInput ComponentType = "DateTimeInput"
 	CompVideo         ComponentType = "Video"
 	CompAudioPlayer   ComponentType = "AudioPlayer"
+	CompSplitView     ComponentType = "SplitView"
+	CompSearchField   ComponentType = "SearchField"
+	CompOutlineView   ComponentType = "OutlineView"
+	CompRichTextEditor ComponentType = "RichTextEditor"
 )
 
 // StyleProps holds visual styling overrides applicable to any component.
@@ -135,4 +139,24 @@ type Props struct {
 	EnableTime *DynamicBoolean `json:"enableTime,omitempty"`
 	DateValue  *DynamicString  `json:"dateValue,omitempty"`
 	OnDateChange *EventAction  `json:"onDateChange,omitempty"`
+
+	// SplitView
+	DividerStyle string          `json:"dividerStyle,omitempty"` // thin, thick, paneSplitter
+	Vertical     *DynamicBoolean `json:"vertical,omitempty"`     // default true (vertical dividers = horizontal panes)
+
+	// SearchField
+	OnSearch *EventAction `json:"onSearch,omitempty"`
+
+	// OutlineView
+	OutlineData *DynamicString `json:"outlineData,omitempty"` // JSON pointer to tree array
+	LabelKey    string         `json:"labelKey,omitempty"`    // key for display text (default "name")
+	ChildrenKey string         `json:"childrenKey,omitempty"` // key for nested items (default "children")
+	IconKey     string         `json:"iconKey,omitempty"`     // key for SF Symbol name
+	IDKey       string         `json:"idKey,omitempty"`       // key for item identifier (default "id")
+	SelectedID  *DynamicString `json:"selectedId,omitempty"`  // currently selected item ID
+
+	// RichTextEditor
+	RichContent *DynamicString  `json:"richContent,omitempty"`  // markdown content
+	Editable    *DynamicBoolean `json:"editable,omitempty"`     // default true
+	OnRichChange *EventAction   `json:"onRichChange,omitempty"` // fired on content change
 }

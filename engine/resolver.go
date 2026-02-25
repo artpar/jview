@@ -168,6 +168,41 @@ func (r *Resolver) Resolve(comp *protocol.Component) *renderer.RenderNode {
 		p.Src = r.resolveString(comp.ComponentID, cp.Src)
 		p.Autoplay = r.resolveBool(comp.ComponentID, cp.Autoplay)
 		p.Loop = r.resolveBool(comp.ComponentID, cp.Loop)
+
+	case protocol.CompSplitView:
+		p.DividerStyle = cp.DividerStyle
+		if p.DividerStyle == "" {
+			p.DividerStyle = "thin"
+		}
+		p.Vertical = r.resolveBoolDefault(comp.ComponentID, cp.Vertical, true)
+
+	case protocol.CompSearchField:
+		p.Placeholder = r.resolveString(comp.ComponentID, cp.Placeholder)
+		p.Value = r.resolveString(comp.ComponentID, cp.Value)
+		p.DataBinding = cp.DataBinding
+
+	case protocol.CompOutlineView:
+		p.OutlineData = r.resolveJSON(comp.ComponentID, cp.OutlineData)
+		p.LabelKey = cp.LabelKey
+		if p.LabelKey == "" {
+			p.LabelKey = "name"
+		}
+		p.ChildrenKey = cp.ChildrenKey
+		if p.ChildrenKey == "" {
+			p.ChildrenKey = "children"
+		}
+		p.IconKey = cp.IconKey
+		p.IDKey = cp.IDKey
+		if p.IDKey == "" {
+			p.IDKey = "id"
+		}
+		p.SelectedID = r.resolveString(comp.ComponentID, cp.SelectedID)
+		p.DataBinding = cp.DataBinding
+
+	case protocol.CompRichTextEditor:
+		p.RichContent = r.resolveString(comp.ComponentID, cp.RichContent)
+		p.Editable = r.resolveBoolDefault(comp.ComponentID, cp.Editable, true)
+		p.DataBinding = cp.DataBinding
 	}
 
 	node.Style = comp.Style
@@ -211,6 +246,31 @@ func (r *Resolver) resolveAssetRef(val string) string {
 		}
 	}
 	return val
+}
+
+// resolveJSON resolves a dynamic string but serializes complex values (arrays, maps) as JSON.
+func (r *Resolver) resolveJSON(componentID string, dv *protocol.DynamicString) string {
+	if dv == nil {
+		return ""
+	}
+	if dv.IsPath {
+		r.tracker.Register(dv.Path, componentID)
+		val, ok := r.dm.Get(dv.Path)
+		if !ok {
+			return ""
+		}
+		switch val.(type) {
+		case string:
+			return val.(string)
+		default:
+			data, err := json.Marshal(val)
+			if err != nil {
+				return ""
+			}
+			return string(data)
+		}
+	}
+	return r.resolveString(componentID, dv)
 }
 
 func (r *Resolver) resolveNumber(componentID string, dv *protocol.DynamicNumber) float64 {
