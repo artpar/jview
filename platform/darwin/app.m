@@ -194,6 +194,7 @@ void JVSetWindowTheme(const char* surfaceID, const char* theme) {
         appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
     }
     window.appearance = appearance;
+    window.backgroundColor = [NSColor windowBackgroundColor];
     invalidateLayersRecursively(window.contentView);
     [window invalidateShadow];
 }
