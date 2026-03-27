@@ -254,6 +254,15 @@ jview exposes native macOS capabilities as evaluator functions, callable from JS
 ### MCP Tools (7 system tools)
 `notify`, `clipboard_read`, `clipboard_write`, `open_url`, `file_open`, `file_save`, `alert`
 
+### Drag & Drop
+Any component can be a drop target via `onDrop` prop:
+```json
+{"componentId":"zone","type":"Card","props":{"onDrop":{"action":{"event":{"name":"fileDrop"}}}}}
+```
+Drop data (JSON: `{"paths":[...],"text":"..."}`) is merged into the event context. Uses a transparent NSView overlay as NSDraggingDestination — accepts file URLs and plain text.
+
+Files: `platform/darwin/droptarget.go` + `.h` + `.m`, callback in `engine/surface.go`
+
 ### Threading
 File dialogs and alerts use `beginWithCompletionHandler:` / `beginSheetModalForWindow:` — the main thread is **never blocked**. The calling goroutine blocks on a Go channel until the user dismisses the dialog. This keeps the AppKit run loop free for rendering, MCP tools, and callbacks while a dialog is open.
 

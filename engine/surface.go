@@ -1182,6 +1182,32 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 			s.trackCallback(comp.ComponentID, "click", cbID)
 		}
 	}
+
+	// onDrop support for any component type
+	if comp.Props.OnDrop != nil && comp.Props.OnDrop.Action != nil {
+		action := comp.Props.OnDrop.Action
+		compIDForLog := comp.ComponentID
+		cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "drop", func(data string) {
+			jlog.Infof("drop", s.id, "onDrop: %s data=%s", compIDForLog, data)
+			if action.Event != nil {
+				// Merge drop data into event context
+				resolved := s.resolveDataRefs(action.Event)
+				var dropData map[string]interface{}
+				if err := json.Unmarshal([]byte(data), &dropData); err == nil {
+					for k, v := range dropData {
+						resolved[k] = v
+					}
+				}
+				if s.ActionHandler != nil {
+					s.ActionHandler(s.id, action.Event, resolved)
+				}
+			} else if action.FunctionCall != nil {
+				s.executeFunctionCall(action.FunctionCall)
+			}
+		})
+		node.Callbacks["drop"] = cbID
+		s.trackCallback(comp.ComponentID, "drop", cbID)
+	}
 }
 
 func (s *Surface) trackCallback(componentID, eventType string, cbID renderer.CallbackID) {
@@ -1646,6 +1672,7 @@ func (s *Surface) rewritePaths(comp *protocol.Component, itemVar string, itemPat
 	rewriteAction(p.OnEnded)
 	rewriteAction(p.OnSearch)
 	rewriteAction(p.OnRichChange)
+	rewriteAction(p.OnDrop)
 
 	// Rewrite paths in contextMenu JSON
 	if p.ContextMenu != nil {
@@ -1728,6 +1755,7 @@ func deepCopyComponent(c protocol.Component) protocol.Component {
 	p.OnEnded = deepCopyEventAction(p.OnEnded)
 	p.OnSearch = deepCopyEventAction(p.OnSearch)
 	p.OnRichChange = deepCopyEventAction(p.OnRichChange)
+	p.OnDrop = deepCopyEventAction(p.OnDrop)
 
 	// Deep copy ContextMenu raw bytes
 	if p.ContextMenu != nil {

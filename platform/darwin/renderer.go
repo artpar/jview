@@ -136,6 +136,11 @@ func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode)
 		}
 	}
 
+	// Attach drop target if onDrop callback registered
+	if cbID, ok := node.Callbacks["drop"]; ok && cbID != 0 {
+		EnableDropTarget(uintptr(handle), uint64(cbID))
+	}
+
 	// Attach context menu if specified
 	if node.Props.ContextMenu != "" {
 		attachContextMenu(uintptr(handle), node.Props.ContextMenu)
@@ -211,6 +216,11 @@ func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle
 		if cbID, ok := node.Callbacks["click"]; ok && cbID != 0 {
 			updateClickGestureCallbackID(handle, uint64(cbID))
 		}
+	}
+
+	// Update drop target callback ID
+	if cbID, ok := node.Callbacks["drop"]; ok && cbID != 0 {
+		UpdateDropTargetCallbackID(uintptr(handle), uint64(cbID))
 	}
 
 	// Update context menu

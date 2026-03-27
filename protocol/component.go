@@ -207,6 +207,9 @@ type Props struct {
 	ProgressValue   *DynamicNumber  `json:"progressValue,omitempty"`
 	Indeterminate   *DynamicBoolean `json:"indeterminate,omitempty"`
 
+	// Drag & Drop
+	OnDrop *EventAction `json:"onDrop,omitempty"` // fired when files/text dropped; data: {"paths":[...],"text":"..."}
+
 	// Universal props
 	ContextMenu json.RawMessage `json:"contextMenu,omitempty"` // []MenuItem for right-click menu
 }
