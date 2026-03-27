@@ -7,9 +7,12 @@ NSMutableDictionary<NSString*, NSWindow*> *windowMap = nil;
 
 // Forward-declare for use in delegate method
 static NSStatusItem *statusItem = nil;
+static NSMenuItem *refineMenuItem = nil;
 
 @interface JVAppDelegate : NSObject <NSApplicationDelegate>
 @end
+
+extern void GoFollowUpTriggered(void);
 
 @implementation JVAppDelegate
 
@@ -23,6 +26,10 @@ static NSStatusItem *statusItem = nil;
     // In menubar mode, keep running when windows close
     if (statusItem != nil) return NO;
     return YES;
+}
+
+- (void)refineUI:(id)sender {
+    GoFollowUpTriggered();
 }
 
 @end
@@ -41,6 +48,14 @@ void JVAppInit(void) {
     [NSApp setMainMenu:menuBar];
 
     NSMenu *appMenu = [[NSMenu alloc] init];
+
+    refineMenuItem = [[NSMenuItem alloc] initWithTitle:@"Refine UI..."
+                                                action:@selector(refineUI:)
+                                         keyEquivalent:@"l"];
+    refineMenuItem.enabled = NO;
+    [appMenu addItem:refineMenuItem];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+
     NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit jview"
                                                       action:@selector(terminate:)
                                                keyEquivalent:@"q"];
@@ -462,4 +477,61 @@ void JVSetWindowRootView(const char* surfaceID, void* view, int padding) {
         [nsView.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-inset],
         bottom,
     ]];
+}
+
+// --- Follow-up prompt panel (Cmd+L) ---
+
+extern void GoNativeDialogResult(uint64_t requestID, const char* result);
+
+void JVSetFollowUpEnabled(int enabled) {
+    if (refineMenuItem) {
+        refineMenuItem.enabled = (enabled != 0);
+    }
+}
+
+void JVShowFollowUpPanel(uint64_t requestID) {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.alertStyle = NSAlertStyleInformational;
+    alert.messageText = @"Refine UI";
+    alert.informativeText = @"Describe what you'd like to change:";
+    [alert addButtonWithTitle:@"Send"];
+    [alert addButtonWithTitle:@"Cancel"];
+
+    NSTextField *textField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 400, 24)];
+    textField.placeholderString = @"e.g. make the sidebar wider, add a reset button...";
+    alert.accessoryView = textField;
+
+    // Make text field first responder after sheet appears
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [alert.window makeFirstResponder:textField];
+    });
+
+    NSWindow *keyWindow = [NSApp keyWindow];
+    if (keyWindow) {
+        [alert beginSheetModalForWindow:keyWindow completionHandler:^(NSModalResponse returnCode) {
+            if (returnCode == NSAlertFirstButtonReturn) {
+                NSString *text = textField.stringValue;
+                if ([text length] > 0) {
+                    GoNativeDialogResult(requestID, [text UTF8String]);
+                } else {
+                    GoNativeDialogResult(requestID, NULL);
+                }
+            } else {
+                GoNativeDialogResult(requestID, NULL);
+            }
+        }];
+    } else {
+        // No key window — run as modal dialog
+        NSModalResponse response = [alert runModal];
+        if (response == NSAlertFirstButtonReturn) {
+            NSString *text = textField.stringValue;
+            if ([text length] > 0) {
+                GoNativeDialogResult(requestID, [text UTF8String]);
+            } else {
+                GoNativeDialogResult(requestID, NULL);
+            }
+        } else {
+            GoNativeDialogResult(requestID, NULL);
+        }
+    }
 }

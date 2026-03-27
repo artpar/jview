@@ -22,4 +22,8 @@ void JVShowSplashWindow(const char* title, int width, int height);
 void JVUpdateSplashStatus(const char* status);
 void JVDismissSplash(void);
 
+// Follow-up prompt panel (Cmd+L)
+void JVShowFollowUpPanel(uint64_t requestID);
+void JVSetFollowUpEnabled(int enabled);
+
 #endif

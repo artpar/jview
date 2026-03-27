@@ -8,7 +8,10 @@ package darwin
 #include "app.h"
 */
 import "C"
-import "unsafe"
+import (
+	"jview/jlog"
+	"unsafe"
+)
 
 // AppInit initializes NSApplication. Must be called from main thread.
 func AppInit() {
@@ -70,4 +73,39 @@ func SetAppMode(mode, icon, title string, callbackID uint64) {
 	defer C.free(unsafe.Pointer(cIcon))
 	defer C.free(unsafe.Pointer(cTitle))
 	C.JVSetAppMode(cMode, cIcon, cTitle, C.uint64_t(callbackID))
+}
+
+// OnFollowUpTriggered is called when the user presses Cmd+L.
+// Set this from main.go to wire the follow-up prompt flow.
+var OnFollowUpTriggered func()
+
+//export GoFollowUpTriggered
+func GoFollowUpTriggered() {
+	if OnFollowUpTriggered != nil {
+		OnFollowUpTriggered()
+	} else {
+		jlog.Infof("app", "", "Cmd+L pressed but no follow-up handler registered")
+	}
+}
+
+// ShowFollowUpPanel shows a native text input dialog for follow-up instructions.
+// Blocks the calling goroutine (not the main thread) until user responds.
+// Returns empty string if cancelled.
+func ShowFollowUpPanel() string {
+	reqID, ch := allocRequest()
+	C.JVShowFollowUpPanel(C.uint64_t(reqID))
+	res := <-ch
+	if res.value == nil {
+		return ""
+	}
+	return *res.value
+}
+
+// SetFollowUpEnabled enables or disables the "Refine UI..." (Cmd+L) menu item.
+func SetFollowUpEnabled(enabled bool) {
+	e := C.int(0)
+	if enabled {
+		e = C.int(1)
+	}
+	C.JVSetFollowUpEnabled(e)
 }

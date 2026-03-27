@@ -292,10 +292,13 @@ func main() {
 			generateDone = make(chan struct{})
 		}
 		ccTr.OnDone = func() {
-			jlog.Infof("main", "", "claude-code: generation complete, finalizing cache")
-			finalizeCache()
-			if generateDone != nil {
-				close(generateDone)
+			jlog.Infof("main", "", "claude-code: generation complete (spawn #%d)", ccTr.SpawnCount)
+			if ccTr.SpawnCount == 1 {
+				// Only finalize cache on initial generation
+				finalizeCache()
+				if generateDone != nil {
+					close(generateDone)
+				}
 			}
 		}
 	}
@@ -514,6 +517,30 @@ func main() {
 					})
 				},
 			}, nil
+		}
+	}
+
+	// Wire Cmd+L follow-up prompt for Claude Code transport
+	if ccTr != nil {
+		// Override OnDone to also re-enable the menu item (needs disp)
+		origOnDone := ccTr.OnDone
+		ccTr.OnDone = func() {
+			if origOnDone != nil {
+				origOnDone()
+			}
+			disp.RunOnMain(func() { darwin.SetFollowUpEnabled(true) })
+		}
+
+		darwin.OnFollowUpTriggered = func() {
+			go func() {
+				disp.RunOnMain(func() { darwin.SetFollowUpEnabled(false) })
+				result := darwin.ShowFollowUpPanel()
+				if result == "" {
+					disp.RunOnMain(func() { darwin.SetFollowUpEnabled(true) })
+					return
+				}
+				ccTr.SendFollowUp(result)
+			}()
 		}
 	}
 

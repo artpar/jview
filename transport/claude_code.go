@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 // ClaudeCodeConfig configures the Claude Code transport.
@@ -53,18 +55,37 @@ type ClaudeCodeTransport struct {
 	OnStatus func(status string)
 
 	// Runtime state
-	mcpHandle *MCPServerHandle
-	cmd       *exec.Cmd
-	tmpFiles  []string
+	mcpHandle  *MCPServerHandle
+	cmd        *exec.Cmd
+	tmpFiles   []string
+	sessionID  string      // UUID for claude --session-id / --resume
+	followUpCh chan string // buffered(1), follow-up prompts
+	SpawnCount int         // 0 = initial, 1+ = follow-up (exported for OnDone checks)
 }
 
 // NewClaudeCodeTransport creates a new Claude Code transport.
 func NewClaudeCodeTransport(cfg ClaudeCodeConfig) *ClaudeCodeTransport {
 	return &ClaudeCodeTransport{
-		config:   cfg,
-		messages: make(chan *protocol.Message, 64),
-		errors:   make(chan error, 8),
-		done:     make(chan struct{}),
+		config:     cfg,
+		messages:   make(chan *protocol.Message, 64),
+		errors:     make(chan error, 8),
+		done:       make(chan struct{}),
+		sessionID:  uuid.New().String(),
+		followUpCh: make(chan string, 1),
+	}
+}
+
+// SessionID returns the UUID used for claude --session-id / --resume.
+func (t *ClaudeCodeTransport) SessionID() string {
+	return t.sessionID
+}
+
+// SendFollowUp queues a follow-up prompt to be sent to Claude via --resume.
+func (t *ClaudeCodeTransport) SendFollowUp(prompt string) {
+	select {
+	case t.followUpCh <- prompt:
+	default:
+		jlog.Infof("transport", "", "claude-code: follow-up channel full, dropping prompt")
 	}
 }
 
@@ -129,11 +150,23 @@ func (t *ClaudeCodeTransport) run() {
 		return
 	}
 
-	// Spawn claude process
+	// Spawn initial claude process
 	t.emitStatus("Launching Claude Code...")
-	jlog.Infof("transport", "", "claude-code: spawning claude -p on port %d", handle.Port)
+	jlog.Infof("transport", "", "claude-code: spawning claude -p on port %d (session=%s)", handle.Port, t.sessionID)
 	jlog.Infof("transport", "", "claude-code: mcp-config=%s ref=%s", mcpConfigPath, refPath)
 	t.spawnClaude(mcpConfigPath, refPath, t.config.Prompt)
+
+	// Follow-up loop: wait for follow-up prompts or shutdown
+	for {
+		select {
+		case prompt := <-t.followUpCh:
+			t.emitStatus("Resuming with follow-up...")
+			jlog.Infof("transport", "", "claude-code: follow-up prompt: %s", truncate(prompt, 100))
+			t.spawnClaude(mcpConfigPath, refPath, prompt)
+		case <-t.done:
+			return
+		}
+	}
 }
 
 // filterEnv returns a copy of env with any variable whose key matches removed.
@@ -200,16 +233,31 @@ func (t *ClaudeCodeTransport) spawnClaude(mcpConfigPath, refPath, prompt string)
 		refPath,
 	)
 
-	args := []string{
-		"-p", prompt,
-		"--append-system-prompt", appendPrompt,
-		"--mcp-config", mcpConfigPath,
-		"--output-format", "text",
-		"--dangerously-skip-permissions",
+	var args []string
+	if t.SpawnCount == 0 {
+		// Initial generation: use --session-id so we can --resume later
+		args = []string{
+			"-p", prompt,
+			"--session-id", t.sessionID,
+			"--append-system-prompt", appendPrompt,
+			"--mcp-config", mcpConfigPath,
+			"--output-format", "text",
+			"--dangerously-skip-permissions",
+		}
+	} else {
+		// Follow-up: resume the same session
+		args = []string{
+			"--resume", t.sessionID,
+			"-p", prompt,
+			"--mcp-config", mcpConfigPath,
+			"--output-format", "text",
+			"--dangerously-skip-permissions",
+		}
 	}
 	if t.config.Model != "" {
 		args = append(args, "--model", t.config.Model)
 	}
+	t.SpawnCount++
 
 	t.cmd = exec.Command("claude", args...)
 	// Clear CLAUDECODE env var to allow nested invocation
@@ -228,7 +276,7 @@ func (t *ClaudeCodeTransport) spawnClaude(mcpConfigPath, refPath, prompt string)
 		return
 	}
 
-	jlog.Infof("transport", "", "claude-code: process started (pid %d)", t.cmd.Process.Pid)
+	jlog.Infof("transport", "", "claude-code: process started (pid %d, spawn #%d)", t.cmd.Process.Pid, t.SpawnCount)
 	t.emitStatus("Claude is thinking...")
 
 	// Read stdout for logging
