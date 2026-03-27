@@ -273,6 +273,12 @@ func (s *Session) HandleMessage(msg *protocol.Message) {
 			s.rend.UpdateWindow(uw.SurfaceID, uw.Title, uw.MinWidth, uw.MinHeight)
 		})
 
+	case protocol.MsgSetAppMode:
+		sam := msg.Body.(protocol.SetAppMode)
+		s.dispatch.RunOnMain(func() {
+			s.rend.SetAppMode(sam.Mode, sam.Icon, sam.Title, 0)
+		})
+
 	default:
 		logWarn("session", "", fmt.Sprintf("unknown message type %s", msg.Type))
 	}

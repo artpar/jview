@@ -28,6 +28,7 @@ const (
 	MsgUpdateMenu       MessageType = "updateMenu"
 	MsgUpdateToolbar    MessageType = "updateToolbar"
 	MsgUpdateWindow     MessageType = "updateWindow"
+	MsgSetAppMode       MessageType = "setAppMode"
 )
 
 // TestMessage defines a test case with a sequence of assert/simulate steps.
@@ -230,6 +231,16 @@ type UpdateWindow struct {
 	Title     string      `json:"title,omitempty"`
 	MinWidth  int         `json:"minWidth,omitempty"`
 	MinHeight int         `json:"minHeight,omitempty"`
+}
+
+// SetAppMode switches the application activation mode.
+// Mode: "normal" (default, dock icon + windows), "menubar" (status bar item, no dock icon),
+// "accessory" (no dock icon, no menu bar, background only).
+type SetAppMode struct {
+	Type  MessageType `json:"type"`
+	Mode  string      `json:"mode"`            // "normal", "menubar", "accessory"
+	Icon  string      `json:"icon,omitempty"`   // SF Symbol name for menubar icon (menubar mode)
+	Title string      `json:"title,omitempty"`  // status item title (menubar mode)
 }
 
 // MenuItem is a single menu or menu item.

@@ -71,4 +71,8 @@ type Renderer interface {
 
 	// UpdateWindow sets window properties (title, minimum size).
 	UpdateWindow(surfaceID string, title string, minWidth, minHeight int)
+
+	// SetAppMode switches the app activation mode.
+	// mode: "normal", "menubar", "accessory"
+	SetAppMode(mode, icon, title string, callbackID CallbackID)
 }

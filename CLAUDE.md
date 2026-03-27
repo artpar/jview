@@ -263,6 +263,20 @@ Drop data (JSON: `{"paths":[...],"text":"..."}`) is merged into the event contex
 
 Files: `platform/darwin/droptarget.go` + `.h` + `.m`, callback in `engine/surface.go`
 
+### App Mode (Menubar / Background)
+Switch app activation policy via `setAppMode` message:
+```json
+{"type":"setAppMode","mode":"menubar","icon":"bolt.fill","title":"jview"}
+```
+Modes:
+- `"normal"` — default, dock icon + windows
+- `"menubar"` — NSStatusItem in menu bar, no dock icon, clicking toggles window visibility
+- `"accessory"` — no dock icon, no menu bar item, background only
+
+In menubar mode, the app stays alive when all windows close. The status item shows an SF Symbol icon or text title.
+
+Files: `platform/darwin/app.m` (JVSetAppMode), protocol message in `protocol/types.go`
+
 ### Threading
 File dialogs and alerts use `beginWithCompletionHandler:` / `beginSheetModalForWindow:` — the main thread is **never blocked**. The calling goroutine blocks on a Go channel until the user dismisses the dialog. This keeps the AppKit run loop free for rendering, MCP tools, and callbacks while a dialog is open.
 

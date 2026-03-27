@@ -386,6 +386,10 @@ func (r *DarwinRenderer) UpdateWindow(surfaceID string, title string, minWidth, 
 	C.JVUpdateWindow(cSID, cTitle, C.int(minWidth), C.int(minHeight))
 }
 
+func (r *DarwinRenderer) SetAppMode(mode, icon, title string, callbackID renderer.CallbackID) {
+	SetAppMode(mode, icon, title, uint64(callbackID))
+}
+
 // removeView removes an NSView from its superview.
 func removeView(handle renderer.ViewHandle) {
 	C.JVRemoveView(unsafe.Pointer(handle))

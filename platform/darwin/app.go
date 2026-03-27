@@ -56,3 +56,18 @@ func UpdateSplashStatus(status string) {
 func DismissSplash() {
 	C.JVDismissSplash()
 }
+
+// SetAppMode switches the application activation mode.
+// mode: "normal" (dock+windows), "menubar" (status bar item), "accessory" (background).
+// icon: SF Symbol name for status bar (menubar mode only).
+// title: text for status bar (menubar mode, fallback when no icon).
+// callbackID: invoked when status item clicked (0 = default toggle windows).
+func SetAppMode(mode, icon, title string, callbackID uint64) {
+	cMode := C.CString(mode)
+	cIcon := C.CString(icon)
+	cTitle := C.CString(title)
+	defer C.free(unsafe.Pointer(cMode))
+	defer C.free(unsafe.Pointer(cIcon))
+	defer C.free(unsafe.Pointer(cTitle))
+	C.JVSetAppMode(cMode, cIcon, cTitle, C.uint64_t(callbackID))
+}

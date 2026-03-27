@@ -212,6 +212,13 @@ func ParseLine(line []byte) (*Message, error) {
 		}
 		msg.Body = uw
 
+	case MsgSetAppMode:
+		var sam SetAppMode
+		if err := json.Unmarshal(env.Payload, &sam); err != nil {
+			return nil, fmt.Errorf("parse setAppMode: %w", err)
+		}
+		msg.Body = sam
+
 	default:
 		return nil, fmt.Errorf("unknown message type: %s", env.Type)
 	}

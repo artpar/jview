@@ -1,6 +1,8 @@
 #ifndef JVIEW_APP_H
 #define JVIEW_APP_H
 
+#include <stdint.h>
+
 void JVAppInit(void);
 void JVAppRun(void);
 void JVAppStop(void);
@@ -12,6 +14,9 @@ void JVSetWindowRootView(const char* surfaceID, void* view, int padding);
 void JVSetWindowTheme(const char* surfaceID, const char* theme);
 void JVRemoveView(void* view);
 void JVUpdateWindow(const char* surfaceID, const char* title, int minWidth, int minHeight);
+
+// App mode: "normal", "menubar", "accessory"
+void JVSetAppMode(const char* mode, const char* icon, const char* title, uint64_t callbackID);
 
 void JVShowSplashWindow(const char* title, int width, int height);
 void JVUpdateSplashStatus(const char* status);

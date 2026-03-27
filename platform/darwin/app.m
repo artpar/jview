@@ -5,6 +5,9 @@
 // Map from surfaceID → NSWindow (non-static so screenshot.m can access via extern)
 NSMutableDictionary<NSString*, NSWindow*> *windowMap = nil;
 
+// Forward-declare for use in delegate method
+static NSStatusItem *statusItem = nil;
+
 @interface JVAppDelegate : NSObject <NSApplicationDelegate>
 @end
 
@@ -17,6 +20,8 @@ NSMutableDictionary<NSString*, NSWindow*> *windowMap = nil;
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
+    // In menubar mode, keep running when windows close
+    if (statusItem != nil) return NO;
     return YES;
 }
 
@@ -241,6 +246,102 @@ void JVUpdateWindow(const char* surfaceID, const char* title, int minWidth, int 
         CGFloat w = (minWidth > 0) ? (CGFloat)minWidth : window.minSize.width;
         CGFloat h = (minHeight > 0) ? (CGFloat)minHeight : window.minSize.height;
         window.minSize = NSMakeSize(w, h);
+    }
+}
+
+// --- App mode (menubar/accessory/normal) ---
+
+extern void GoCallbackInvoke(uint64_t callbackID, const char* data);
+
+static uint64_t statusItemCallbackID = 0;
+
+@interface JVStatusItemTarget : NSObject
+@end
+
+@implementation JVStatusItemTarget
+- (void)statusItemClicked:(id)sender {
+    if (statusItemCallbackID != 0) {
+        GoCallbackInvoke(statusItemCallbackID, "");
+    } else {
+        // Default: toggle visibility of all windows
+        BOOL anyVisible = NO;
+        for (NSString *sid in windowMap) {
+            NSWindow *w = windowMap[sid];
+            if ([w isVisible]) { anyVisible = YES; break; }
+        }
+        for (NSString *sid in windowMap) {
+            NSWindow *w = windowMap[sid];
+            if (anyVisible) {
+                [w orderOut:nil];
+            } else {
+                [w makeKeyAndOrderFront:nil];
+                [NSApp activateIgnoringOtherApps:YES];
+            }
+        }
+    }
+}
+@end
+
+static JVStatusItemTarget *statusItemTarget = nil;
+
+void JVSetAppMode(const char* mode, const char* icon, const char* title, uint64_t callbackID) {
+    NSString *modeStr = [NSString stringWithUTF8String:mode];
+
+    if ([modeStr isEqualToString:@"menubar"]) {
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+
+        // Create status item if not exists
+        if (!statusItem) {
+            statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+            statusItemTarget = [[JVStatusItemTarget alloc] init];
+            statusItem.button.action = @selector(statusItemClicked:);
+            statusItem.button.target = statusItemTarget;
+        }
+        statusItemCallbackID = callbackID;
+
+        // Set icon (SF Symbol) or title
+        if (icon && strlen(icon) > 0) {
+            NSString *iconName = [NSString stringWithUTF8String:icon];
+            NSImage *img = [NSImage imageWithSystemSymbolName:iconName accessibilityDescription:nil];
+            if (img) {
+                statusItem.button.image = img;
+                statusItem.button.title = @"";
+            } else {
+                // Fallback to title if symbol not found
+                statusItem.button.image = nil;
+                statusItem.button.title = (title && strlen(title) > 0)
+                    ? [NSString stringWithUTF8String:title] : @"jview";
+            }
+        } else {
+            statusItem.button.image = nil;
+            statusItem.button.title = (title && strlen(title) > 0)
+                ? [NSString stringWithUTF8String:title] : @"jview";
+        }
+
+        // Don't terminate when last window closes in menubar mode
+        // (handled by checking mode in delegate)
+
+    } else if ([modeStr isEqualToString:@"accessory"]) {
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+
+        // Remove status item if exists
+        if (statusItem) {
+            [[NSStatusBar systemStatusBar] removeStatusItem:statusItem];
+            statusItem = nil;
+            statusItemTarget = nil;
+        }
+
+    } else {
+        // "normal" — restore dock icon
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        [NSApp activateIgnoringOtherApps:YES];
+
+        // Remove status item if exists
+        if (statusItem) {
+            [[NSStatusBar systemStatusBar] removeStatusItem:statusItem];
+            statusItem = nil;
+            statusItemTarget = nil;
+        }
     }
 }
 
