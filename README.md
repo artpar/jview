@@ -157,7 +157,54 @@ Spawn background goroutines with their own transports. Timers, background LLM co
 
 Channels support broadcast (all subscribers get every message) and queue (round-robin) modes. Published values land in the data model, so `dataBinding` just works.
 
-### MCP server (26 tools)
+### System capabilities
+
+jview apps can access native macOS APIs through evaluator functions — clipboard, notifications, file dialogs, alerts, HTTP, and shell commands. No webview shims.
+
+| Function | What it does |
+|---|---|
+| `notify(title, body)` | macOS notification via UNUserNotificationCenter |
+| `clipboardRead()` / `clipboardWrite(text)` | System clipboard (NSPasteboard) |
+| `fileOpen()` / `fileSave()` | Native file dialogs (NSOpenPanel / NSSavePanel) |
+| `alert(title, msg)` | Modal alert sheet (NSAlert) |
+| `openURL(url)` | Open in default app (NSWorkspace) |
+| `httpGet(url)` / `httpPost(url, body)` | HTTP requests with 30s timeout |
+| `shell(command)` | Run any shell command |
+
+File dialogs and alerts are non-blocking — they use `beginSheetModalForWindow:completionHandler:` so the main thread stays free for rendering and MCP calls while a dialog is open.
+
+All system functions are also available as MCP tools (`notify`, `clipboard_read`, `clipboard_write`, `open_url`, `file_open`, `file_save`, `alert`).
+
+### Drag and drop
+
+Any component can accept dropped files and text:
+
+```json
+{"componentId":"zone","type":"Card","props":{
+  "dataBinding":"/dropped",
+  "onDrop":{"action":{"event":{"name":"fileDrop"}}}
+}}
+```
+
+Drop data (`{"paths":["/path/to/file"],"text":"..."}`) is written to the `dataBinding` path and the action event is fired. Uses a transparent NSView overlay as NSDraggingDestination.
+
+### Menubar and background apps
+
+Switch between dock app, menubar app, and invisible background app at runtime:
+
+```json
+{"type":"setAppMode","mode":"menubar","icon":"bolt.fill","title":"jview"}
+```
+
+| Mode | Behavior |
+|---|---|
+| `"normal"` | Default — dock icon, windows, standard app |
+| `"menubar"` | NSStatusItem in menu bar, no dock icon, click toggles windows |
+| `"accessory"` | No dock icon, no menu bar — invisible background process |
+
+In menubar mode the app stays alive when all windows close.
+
+### MCP server (34 tools)
 
 Every jview instance is an MCP server on stdin/stdout. Click buttons, fill text fields, read the data model, take screenshots, send raw messages. Claude Code connects through `.mcp.json` for interactive development.
 
@@ -166,7 +213,7 @@ build/jview mcp testdata/hello.jsonl       # dedicated MCP mode
 build/jview --mcp-http localhost:8080 ...  # also on HTTP
 ```
 
-Tools include: `click`, `fill`, `toggle`, `get_tree`, `get_component`, `get_data_model`, `set_data_model`, `take_screenshot`, `get_layout`, `get_style`, `send_message`, `get_logs`, `list_surfaces`, `create_process`, `create_channel`, `publish`, `subscribe`, and more.
+Tools include: `click`, `fill`, `toggle`, `get_tree`, `get_component`, `get_data_model`, `set_data_model`, `take_screenshot`, `get_layout`, `get_style`, `send_message`, `get_logs`, `list_surfaces`, `create_process`, `create_channel`, `publish`, `subscribe`, `notify`, `clipboard_read`, `clipboard_write`, `open_url`, `file_open`, `file_save`, `alert`, and more.
 
 ### Dark mode and theming
 
@@ -259,7 +306,7 @@ make check         # test + verify (the gate before commits)
 protocol/          JSONL parsing and message types
 engine/            session, surfaces, data model, bindings, resolver, library, cache, FFI
 renderer/          Renderer interface (platform-agnostic) + mock for tests
-platform/darwin/   CGo + ObjC implementation of Renderer (23 components)
+platform/darwin/   CGo + ObjC implementation of Renderer (23 components + native APIs)
 transport/         file, directory, watch, LLM, Claude Code, interval transports
 mcp/               MCP server (JSON-RPC 2.0, stdin/stdout + HTTP)
 packaging/         .app bundle resources (Info.plist)
