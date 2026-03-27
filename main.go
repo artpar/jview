@@ -91,6 +91,7 @@ func main() {
 	regenerate := flag.Bool("regenerate", false, "Force fresh LLM call, ignore cache")
 	generateOnly := flag.Bool("generate-only", false, "Generate JSONL and exit without opening a window")
 	claudeCode := flag.String("claude-code", "", "Prompt for Claude Code to build UI (spawns claude subprocess)")
+	saveComponent := flag.String("save-component", "", "Save generated UI as reusable library component")
 	watch := flag.Bool("watch", false, "Watch JSONL files for changes and reload automatically")
 	mcpHTTPAddr := flag.String("mcp-http", "", "Also listen for MCP on HTTP (e.g. localhost:8080)")
 	flag.Parse()
@@ -132,6 +133,16 @@ func main() {
 		cacheJsonl, cacheHash, cacheTmp = engine.CachePathsForPrompt(cachePrompt, componentRef)
 
 		if !*regenerate && engine.CacheValid(cacheJsonl, cacheHash, cachePrompt, componentRef) {
+			if *saveComponent != "" {
+				dc, err := engine.ExtractComponent(cacheJsonl, *saveComponent)
+				if err != nil {
+					jlog.Errorf("main", "", "save-component: extract failed: %v", err)
+				} else if err := lib.Save(dc); err != nil {
+					jlog.Errorf("main", "", "save-component: save failed: %v", err)
+				} else {
+					fmt.Fprintf(os.Stderr, "saved component %q to library\n", *saveComponent)
+				}
+			}
 			if *generateOnly {
 				jlog.Infof("main", "", "cache hit: %s (up to date)", cacheJsonl)
 				os.Exit(0)
@@ -164,6 +175,16 @@ func main() {
 
 		// Unified cache check
 		if !*regenerate && cachePrompt != "" && engine.CacheValid(cacheJsonl, cacheHash, cachePrompt, componentRef) {
+			if *saveComponent != "" {
+				dc, err := engine.ExtractComponent(cacheJsonl, *saveComponent)
+				if err != nil {
+					jlog.Errorf("main", "", "save-component: extract failed: %v", err)
+				} else if err := lib.Save(dc); err != nil {
+					jlog.Errorf("main", "", "save-component: save failed: %v", err)
+				} else {
+					fmt.Fprintf(os.Stderr, "saved component %q to library\n", *saveComponent)
+				}
+			}
 			if *generateOnly {
 				jlog.Infof("main", "", "cache hit: %s (up to date)", cacheJsonl)
 				os.Exit(0)
@@ -197,6 +218,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "       jview --llm openai --model gpt-4o --prompt-file prompt.txt\n")
 		fmt.Fprintf(os.Stderr, "       jview --prompt-file prompt.txt --generate-only\n")
 		fmt.Fprintf(os.Stderr, "       jview --claude-code \"Build a counter with + and - buttons\"\n")
+		fmt.Fprintf(os.Stderr, "       jview --claude-code \"keyboard\" --save-component keyboard\n")
 		fmt.Fprintf(os.Stderr, "       jview --watch testdata/contact_form.jsonl\n")
 		fmt.Fprintf(os.Stderr, "       jview --ffi-config libs.json testdata/app.jsonl\n")
 		os.Exit(1)
@@ -233,6 +255,17 @@ func main() {
 			jlog.Errorf("main", "", "cache: write hash failed: %v", err)
 		}
 		recorder = nil
+		// Save as library component if requested
+		if *saveComponent != "" {
+			dc, err := engine.ExtractComponent(cacheJsonl, *saveComponent)
+			if err != nil {
+				jlog.Errorf("main", "", "save-component: extract failed: %v", err)
+			} else if err := lib.Save(dc); err != nil {
+				jlog.Errorf("main", "", "save-component: save failed: %v", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "saved component %q to library\n", *saveComponent)
+			}
+		}
 		select {
 		case <-cacheFinalized:
 		default:
