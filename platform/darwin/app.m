@@ -189,6 +189,35 @@ void* JVCreateWindow(const char* title, int width, int height, const char* surfa
     return (__bridge void*)window;
 }
 
+// Recursively nil all delegates on component views to prevent AppKit from
+// firing delegate callbacks during view teardown (which causes SIGSEGV when
+// the delegate references a partially-destroyed view hierarchy).
+static void nilDelegatesRecursively(NSView *view) {
+    for (NSView *subview in [view.subviews copy]) {
+        nilDelegatesRecursively(subview);
+    }
+    if ([view isKindOfClass:[NSSplitView class]]) {
+        ((NSSplitView *)view).delegate = nil;
+    } else if ([view isKindOfClass:[NSOutlineView class]]) {
+        ((NSOutlineView *)view).delegate = nil;
+        ((NSOutlineView *)view).dataSource = nil;
+    } else if ([view isKindOfClass:[NSSearchField class]]) {
+        ((NSSearchField *)view).delegate = nil;
+    } else if ([view isKindOfClass:[NSTextField class]]) {
+        ((NSTextField *)view).delegate = nil;
+    } else if ([view isKindOfClass:[NSTabView class]]) {
+        ((NSTabView *)view).delegate = nil;
+    } else if ([view isKindOfClass:[NSScrollView class]]) {
+        NSView *docView = ((NSScrollView *)view).documentView;
+        if ([docView isKindOfClass:[NSOutlineView class]]) {
+            ((NSOutlineView *)docView).delegate = nil;
+            ((NSOutlineView *)docView).dataSource = nil;
+        } else if ([docView isKindOfClass:[NSTextView class]]) {
+            ((NSTextView *)docView).delegate = nil;
+        }
+    }
+}
+
 void JVDestroyWindow(const char* surfaceID) {
     NSString *sid = [NSString stringWithUTF8String:surfaceID];
     NSWindow *window = windowMap[sid];
@@ -200,6 +229,10 @@ void JVDestroyWindow(const char* surfaceID) {
         // Nil the delegate so AppKit won't call windowWillClose: etc.
         // on a potentially deallocated object
         window.delegate = nil;
+
+        // Nil all component-level delegates before removing subviews —
+        // prevents SIGSEGV from delegate callbacks during teardown
+        nilDelegatesRecursively([window contentView]);
 
         // Detach all subviews before closing — prevents AppKit from
         // walking the view tree and hitting freed ObjC objects
@@ -246,6 +279,9 @@ void JVSetWindowTheme(const char* surfaceID, const char* theme) {
 void JVRemoveView(void* view) {
     if (!view) return;
     NSView *nsView = (__bridge NSView*)view;
+    // Nil delegates before removal to prevent AppKit from firing callbacks
+    // on partially-destroyed view hierarchies (causes SIGSEGV)
+    nilDelegatesRecursively(nsView);
     [nsView removeFromSuperview];
 }
 

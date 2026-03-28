@@ -67,6 +67,16 @@ func (r *DarwinRenderer) DestroyWindow(surfaceID string) {
 			}
 		}
 	}
+	// Run per-component cleanup (observer removal, player pause, etc.)
+	// before destroying the window — DestroyWindow's setSubviews:@[] won't
+	// trigger these cleanups since it bypasses RemoveView.
+	if surfHandles, ok := r.handles[surfaceID]; ok {
+		for _, handle := range surfHandles {
+			compType := r.types[handle]
+			cleanupView(handle, compType)
+			delete(r.types, handle)
+		}
+	}
 	delete(r.handles, surfaceID)
 	delete(r.callbacks, surfaceID)
 	r.destroyed[surfaceID] = true
