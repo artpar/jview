@@ -707,6 +707,10 @@ func main() {
 		os.Exit(0)
 	}()
 
+	if ccTr != nil {
+		defer ccTr.Stop()
+	}
+
 	// Run the macOS event loop (blocks forever)
 	darwin.AppRun()
 }

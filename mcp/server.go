@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"jview/engine"
 	"jview/jlog"
 	"jview/protocol"
@@ -259,6 +260,9 @@ func (s *Server) SendMessage(raw json.RawMessage) error {
 	msg, err := protocol.ParseLine(raw)
 	if err != nil {
 		return err
+	}
+	if msg.Type == "deleteSurface" {
+		return fmt.Errorf("deleteSurface is not allowed via send_message")
 	}
 	jlog.Infof("mcp", "", "SendMessage: type=%s", msg.Type)
 	s.sess.HandleMessage(msg)
