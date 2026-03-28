@@ -23,6 +23,7 @@ void* JVCreateIcon(const char* name, int size) {
 }
 
 void JVUpdateIcon(void* handle, const char* name, int size) {
+    if (!handle) return;
     NSImageView *imageView = (__bridge NSImageView*)handle;
     NSString *nameStr = [NSString stringWithUTF8String:name];
 

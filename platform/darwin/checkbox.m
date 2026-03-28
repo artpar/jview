@@ -39,6 +39,7 @@ void* JVCreateCheckBox(const char* label, bool checked, uint64_t callbackID) {
 }
 
 void JVUpdateCheckBox(void* handle, const char* label, bool checked) {
+    if (!handle) return;
     NSButton *checkbox = (__bridge NSButton*)handle;
     checkbox.title = [NSString stringWithUTF8String:label];
     checkbox.state = checked ? NSControlStateValueOn : NSControlStateValueOff;

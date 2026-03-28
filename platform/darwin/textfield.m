@@ -71,6 +71,7 @@ void* JVCreateTextField(const char* placeholder, const char* value,
 
 void JVUpdateTextField(void* handle, const char* placeholder, const char* value,
                         const char* inputType, bool readOnly) {
+    if (!handle) return;
     NSStackView *wrapper = (__bridge NSStackView*)handle;
     NSTextField *field = objc_getAssociatedObject(wrapper, kTextFieldInnerFieldKey);
     if (!field) return;
@@ -94,6 +95,7 @@ void JVUpdateTextField(void* handle, const char* placeholder, const char* value,
 }
 
 void JVSetTextFieldErrors(void* handle, const char** errors, int count) {
+    if (!handle) return;
     NSStackView *wrapper = (__bridge NSStackView*)handle;
     NSTextField *field = objc_getAssociatedObject(wrapper, kTextFieldInnerFieldKey);
     if (!field) return;

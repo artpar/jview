@@ -48,6 +48,7 @@ void* JVCreateSearchField(const char* placeholder, const char* value, uint64_t c
 }
 
 void JVUpdateSearchField(void* handle, const char* placeholder, const char* value) {
+    if (!handle) return;
     NSSearchField *field = (__bridge NSSearchField*)handle;
     field.placeholderString = [NSString stringWithUTF8String:placeholder];
 

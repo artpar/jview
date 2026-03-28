@@ -98,6 +98,7 @@ void* JVCreateModal(const char* title, bool visible, const char* surfaceID, int 
 }
 
 void JVUpdateModal(void* handle, const char* title, bool visible) {
+    if (!handle) return;
     NSView *proxy = (__bridge NSView*)handle;
     NSPanel *panel = objc_getAssociatedObject(proxy, kModalPanelKey);
     if (!panel) return;
@@ -117,6 +118,7 @@ void JVUpdateModal(void* handle, const char* title, bool visible) {
 }
 
 void JVModalSetChildren(void* handle, void** children, int count) {
+    if (!handle) return;
     NSView *proxy = (__bridge NSView*)handle;
     NSStackView *contentStack = objc_getAssociatedObject(proxy, kModalContentStackKey);
     if (!contentStack) return;
@@ -136,6 +138,7 @@ void JVModalSetChildren(void* handle, void** children, int count) {
 }
 
 void JVCleanupModal(void* handle) {
+    if (!handle) return;
     NSView *proxy = (__bridge NSView*)handle;
     NSPanel *panel = objc_getAssociatedObject(proxy, kModalPanelKey);
     if (panel) {

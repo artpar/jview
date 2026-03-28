@@ -251,6 +251,7 @@ void* JVCreateAudio(const char* src, bool autoplay, bool loop, uint64_t endedCbI
 }
 
 void JVUpdateAudio(void* handle, const char* src, bool loop) {
+    if (!handle) return;
     NSView *container = (__bridge NSView*)handle;
 
     // Update loop flag
@@ -264,6 +265,7 @@ void JVUpdateAudio(void* handle, const char* src, bool loop) {
 }
 
 void JVCleanupAudio(void* handle) {
+    if (!handle) return;
     NSView *container = (__bridge NSView*)handle;
     removeTimeObserver(container);
     removeEndedObserver(container);

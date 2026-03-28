@@ -27,6 +27,8 @@ type DarwinRenderer struct {
 	callbacks map[string]map[string]map[string]renderer.CallbackID
 	// surfaceID → padding
 	surfacePadding map[string]int
+	// surfaces that have been destroyed — reject further operations
+	destroyed map[string]bool
 }
 
 func NewRenderer() *DarwinRenderer {
@@ -35,6 +37,7 @@ func NewRenderer() *DarwinRenderer {
 		types:          make(map[renderer.ViewHandle]protocol.ComponentType),
 		callbacks:      make(map[string]map[string]map[string]renderer.CallbackID),
 		surfacePadding: make(map[string]int),
+		destroyed:      make(map[string]bool),
 	}
 }
 
@@ -54,12 +57,9 @@ func (r *DarwinRenderer) CreateWindow(spec renderer.WindowSpec) {
 }
 
 func (r *DarwinRenderer) DestroyWindow(surfaceID string) {
-	cSID := C.CString(surfaceID)
-	defer C.free(unsafe.Pointer(cSID))
-	C.JVDestroyWindow(cSID)
-
+	// Unregister all callbacks BEFORE destroying ObjC views — prevents callbacks
+	// from firing against freed views between destroy and unregister.
 	r.mu.Lock()
-	// Unregister all callbacks from globalRegistry before removing tracking
 	if comps, ok := r.callbacks[surfaceID]; ok {
 		for _, events := range comps {
 			for _, cbID := range events {
@@ -69,10 +69,22 @@ func (r *DarwinRenderer) DestroyWindow(surfaceID string) {
 	}
 	delete(r.handles, surfaceID)
 	delete(r.callbacks, surfaceID)
+	r.destroyed[surfaceID] = true
 	r.mu.Unlock()
+
+	cSID := C.CString(surfaceID)
+	defer C.free(unsafe.Pointer(cSID))
+	C.JVDestroyWindow(cSID)
 }
 
 func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode) renderer.ViewHandle {
+	r.mu.Lock()
+	if r.destroyed[surfaceID] {
+		r.mu.Unlock()
+		return 0
+	}
+	r.mu.Unlock()
+
 	var handle renderer.ViewHandle
 
 	switch node.Type {
@@ -158,6 +170,16 @@ func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode)
 }
 
 func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle, node *renderer.RenderNode) {
+	if handle == 0 {
+		return
+	}
+	r.mu.Lock()
+	if r.destroyed[surfaceID] {
+		r.mu.Unlock()
+		return
+	}
+	r.mu.Unlock()
+
 	switch node.Type {
 	case protocol.CompText:
 		updateTextView(handle, node)
@@ -230,6 +252,16 @@ func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle
 }
 
 func (r *DarwinRenderer) SetChildren(surfaceID string, parentHandle renderer.ViewHandle, childHandles []renderer.ViewHandle) {
+	if parentHandle == 0 {
+		return
+	}
+	r.mu.Lock()
+	if r.destroyed[surfaceID] {
+		r.mu.Unlock()
+		return
+	}
+	r.mu.Unlock()
+
 	parentType := r.GetComponentType(parentHandle)
 
 	switch parentType {

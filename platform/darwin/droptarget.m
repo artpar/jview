@@ -76,6 +76,7 @@ static const void *kDropDelegateKey = &kDropDelegateKey;
 @end
 
 void JVEnableDropTarget(void* handle, uint64_t callbackID) {
+    if (!handle) return;
     NSView *view = (__bridge NSView*)handle;
 
     // Remove existing overlay if any
@@ -94,6 +95,7 @@ void JVEnableDropTarget(void* handle, uint64_t callbackID) {
 }
 
 void JVUpdateDropTargetCallbackID(void* handle, uint64_t callbackID) {
+    if (!handle) return;
     NSView *view = (__bridge NSView*)handle;
     JVDropOverlay *overlay = objc_getAssociatedObject(view, kDropDelegateKey);
     if (overlay) {
@@ -102,6 +104,7 @@ void JVUpdateDropTargetCallbackID(void* handle, uint64_t callbackID) {
 }
 
 void JVDisableDropTarget(void* handle) {
+    if (!handle) return;
     NSView *view = (__bridge NSView*)handle;
     JVDropOverlay *overlay = objc_getAssociatedObject(view, kDropDelegateKey);
     if (overlay) {

@@ -68,7 +68,12 @@ func (pm *ProcessManager) Create(cp protocol.CreateProcess) error {
 	pm.processes[cp.ProcessID] = proc
 	pm.mu.Unlock()
 
-	pm.setStatus(cp.ProcessID, "running")
+	pm.sess.forEachSurfaceLocked(func(sid string, surf *Surface) {
+		surf.HandleUpdateDataModel(protocol.UpdateDataModel{
+			SurfaceID: sid,
+			Ops:       []protocol.DataModelOp{{Op: "add", Path: fmt.Sprintf("/processes/%s/status", cp.ProcessID), Value: "running"}},
+		})
+	})
 
 	go proc.run(pm.sess, pm)
 	return nil
@@ -96,7 +101,12 @@ func (pm *ProcessManager) Stop(processID string) error {
 	proc.status = "stopped"
 	pm.mu.Unlock()
 
-	pm.setStatus(processID, "stopped")
+	pm.sess.forEachSurfaceLocked(func(sid string, surf *Surface) {
+		surf.HandleUpdateDataModel(protocol.UpdateDataModel{
+			SurfaceID: sid,
+			Ops:       []protocol.DataModelOp{{Op: "add", Path: fmt.Sprintf("/processes/%s/status", processID), Value: "stopped"}},
+		})
+	})
 
 	// Clean up channel subscriptions for this process
 	if cm := pm.sess.ChannelManager(); cm != nil {
@@ -156,18 +166,16 @@ func (pm *ProcessManager) StopAll() {
 	}
 }
 
-// setStatus writes process status to the data model of all surfaces and triggers re-render.
+// setStatus writes process status to the data model of all surfaces.
+// Called from goroutines (not from within HandleMessage) — uses ForEachSurface which acquires the lock.
 func (pm *ProcessManager) setStatus(processID, status string) {
 	path := fmt.Sprintf("/processes/%s/status", processID)
-	for _, sid := range pm.sess.SurfaceIDs() {
-		surf := pm.sess.GetSurface(sid)
-		if surf != nil {
-			surf.HandleUpdateDataModel(protocol.UpdateDataModel{
-				SurfaceID: sid,
-				Ops: []protocol.DataModelOp{{Op: "add", Path: path, Value: status}},
-			})
-		}
-	}
+	pm.sess.ForEachSurface(func(sid string, surf *Surface) {
+		surf.HandleUpdateDataModel(protocol.UpdateDataModel{
+			SurfaceID: sid,
+			Ops:       []protocol.DataModelOp{{Op: "add", Path: path, Value: status}},
+		})
+	})
 }
 
 // run is the process goroutine. Reads from transport and routes to session.
@@ -185,7 +193,7 @@ func (p *Process) run(sess *Session, pm *ProcessManager) {
 				pm.mu.Lock()
 				p.status = "stopped"
 				pm.mu.Unlock()
-				pm.setStatus(p.ID, "stopped")
+				pm.setStatus(p.ID, "stopped") // called from goroutine, uses ForEachSurface (locking)
 				if cm := sess.ChannelManager(); cm != nil {
 					cm.CleanupProcess(p.ID)
 				}

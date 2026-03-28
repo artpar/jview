@@ -107,6 +107,7 @@ void* JVCreateVideo(const char* src, int width, int height, bool autoplay, bool 
 }
 
 void JVUpdateVideo(void* handle, const char* src, int width, int height, bool loop, bool controls, bool muted) {
+    if (!handle) return;
     AVPlayerView *playerView = (__bridge AVPlayerView*)handle;
 
     // Update controls style
@@ -138,6 +139,7 @@ void JVUpdateVideo(void* handle, const char* src, int width, int height, bool lo
 }
 
 void JVCleanupVideo(void* handle) {
+    if (!handle) return;
     AVPlayerView *playerView = (__bridge AVPlayerView*)handle;
     removeEndedObserver(playerView);
     if (playerView.player) {

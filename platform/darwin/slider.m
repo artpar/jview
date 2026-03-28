@@ -49,6 +49,7 @@ void* JVCreateSlider(double min, double max, double step, double value, uint64_t
 }
 
 void JVUpdateSlider(void* handle, double min, double max, double step, double value) {
+    if (!handle) return;
     NSSlider *slider = (__bridge NSSlider*)handle;
     slider.minValue = min;
     slider.maxValue = max;

@@ -20,6 +20,7 @@ static const void *kClickGestureTargetKey = &kClickGestureTargetKey;
 @end
 
 void JVAttachClickGesture(void* handle, uint64_t callbackID) {
+    if (!handle) return;
     NSView *view = (__bridge NSView*)handle;
 
     JVClickGestureTarget *target = [[JVClickGestureTarget alloc] init];
@@ -35,6 +36,7 @@ void JVAttachClickGesture(void* handle, uint64_t callbackID) {
 }
 
 void JVUpdateClickGestureCallbackID(void* handle, uint64_t callbackID) {
+    if (!handle) return;
     NSView *view = (__bridge NSView*)handle;
     JVClickGestureTarget *target = objc_getAssociatedObject(view, kClickGestureTargetKey);
     if (target) {

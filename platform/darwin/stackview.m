@@ -62,6 +62,7 @@ void* JVCreateStackView(bool horizontal, const char* justify, const char* align,
 }
 
 void JVUpdateStackView(void* handle, const char* justify, const char* align, int gap, int padding) {
+    if (!handle) return;
     NSStackView *stack = (__bridge NSStackView*)handle;
     stack.spacing = gap;
     stack.edgeInsets = NSEdgeInsetsMake(padding, padding, padding, padding);
@@ -118,6 +119,7 @@ static void pinCrossAxis(NSView *child, NSStackView *stack, BOOL stretch,
 }
 
 void JVStackViewSetChildren(void* handle, void** children, int count) {
+    if (!handle) return;
     NSStackView *stack = (__bridge NSStackView*)handle;
     BOOL stretch = [objc_getAssociatedObject(stack, kStretchModeKey) boolValue];
     bool vertical = (stack.orientation == NSUserInterfaceLayoutOrientationVertical);

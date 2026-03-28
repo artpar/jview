@@ -313,6 +313,11 @@ func main() {
 			goSess.SetRecorder(recorder)
 		}
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					jlog.Errorf("main", "", "panic in generate-only transport: %v", r)
+				}
+			}()
 			tr.Start()
 			errCh := tr.Errors()
 			for {
@@ -450,6 +455,11 @@ func main() {
 	toolNames := mcpServer.ToolNames()
 	jlog.Infof("main", "", "mcp: listening on stdin/stdout (%d tools: %s)", len(toolNames), strings.Join(toolNames, ", "))
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				jlog.Errorf("main", "", "panic in mcp stdin server: %v", r)
+			}
+		}()
 		mcpTransport := mcp.NewStdioTransport(os.Stdin, os.Stdout)
 		ctx := context.Background()
 		if err := mcpServer.Run(ctx, mcpTransport); err != nil {
@@ -855,6 +865,11 @@ func runMCP(args []string) {
 
 	// Run MCP server in goroutine; on EOF, quit the app
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				jlog.Errorf("main", "", "panic in mcp server: %v", r)
+			}
+		}()
 		ctx := context.Background()
 		if err := mcpServer.Run(ctx, mcpTransport); err != nil {
 			jlog.Errorf("main", "", "mcp: server error: %v", err)

@@ -317,6 +317,7 @@ void* JVCreateOutlineView(const char* dataJSON, const char* labelKey,
 }
 
 void JVUpdateOutlineView(void* handle, const char* dataJSON, const char* selectedID) {
+    if (!handle) return;
     NSScrollView *scrollView = (__bridge NSScrollView*)handle;
     NSOutlineView *outlineView = objc_getAssociatedObject(scrollView, kOutlineInnerKey);
     JVOutlineDataSource *dataSource = objc_getAssociatedObject(scrollView, kOutlineDataSourceKey);

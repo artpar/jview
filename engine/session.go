@@ -6,10 +6,12 @@ import (
 	"jview/jlog"
 	"jview/protocol"
 	"jview/renderer"
+	"sync"
 )
 
 // Session manages all surfaces and routes incoming messages.
 type Session struct {
+	mu       sync.Mutex
 	surfaces map[string]*Surface
 	rend     renderer.Renderer
 	dispatch renderer.Dispatcher
@@ -88,14 +90,32 @@ func (s *Session) ChannelManager() *ChannelManager {
 // FlushPendingComponents flushes buffered updateComponents on all surfaces.
 // Call this after the message stream ends to ensure all components are rendered.
 func (s *Session) FlushPendingComponents() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.flushPendingComponentsLocked()
+}
+
+// flushPendingComponentsLocked is the lock-free inner implementation.
+// Caller must hold s.mu.
+func (s *Session) flushPendingComponentsLocked() {
 	for _, surf := range s.surfaces {
 		surf.FlushPendingComponents()
 	}
 }
 
 // HandleMessage routes a parsed A2UI message to the appropriate surface.
+// Serialized via s.mu to prevent concurrent map access from transport + MCP goroutines.
 func (s *Session) HandleMessage(msg *protocol.Message) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	defer logRecover("session", "", "HandleMessage")
+	s.handleMessageLocked(msg)
+}
+
+// handleMessageLocked does the actual work. Caller must hold s.mu.
+// Methods called from here that need to call back into session (channel/process managers)
+// use ForEachSurfaceLocked which accesses s.surfaces directly without re-acquiring the lock.
+func (s *Session) handleMessageLocked(msg *protocol.Message) {
 	jlog.Infof("session", msg.SurfaceID, "HandleMessage: type=%s", msg.Type)
 
 	// Record to cache file if a recorder is active
@@ -104,7 +124,7 @@ func (s *Session) HandleMessage(msg *protocol.Message) {
 	// Flush buffered components before any non-updateComponents message.
 	// This ensures batched updateComponents calls render as a single pass.
 	if msg.Type != protocol.MsgUpdateComponents {
-		s.FlushPendingComponents()
+		s.flushPendingComponentsLocked()
 	}
 
 	switch msg.Type {
@@ -325,7 +345,7 @@ func (s *Session) deleteSurface(surfaceID string) {
 	if !ok {
 		return
 	}
-	surf.CleanupAll()
+	surf.CleanupAll(true) // skip individual RemoveView — DestroyWindow handles it atomically
 	delete(s.surfaces, surfaceID)
 	s.dispatch.RunOnMain(func() {
 		s.rend.DestroyWindow(surfaceID)
@@ -406,17 +426,57 @@ func (s *Session) handleDefineComponent(dc protocol.DefineComponent) {
 }
 
 // GetSurface returns the surface with the given ID, or nil if not found.
+// Safe to call from any goroutine.
 func (s *Session) GetSurface(id string) *Surface {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.surfaces[id]
+}
+
+// getSurfaceLocked returns the surface without acquiring the mutex.
+// Caller must hold s.mu.
+func (s *Session) getSurfaceLocked(id string) *Surface {
 	return s.surfaces[id]
 }
 
 // SurfaceIDs returns the IDs of all active surfaces.
+// Safe to call from any goroutine.
 func (s *Session) SurfaceIDs() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.surfaceIDsLocked()
+}
+
+// surfaceIDsLocked returns surface IDs without acquiring the mutex.
+// Caller must hold s.mu or be called from within HandleMessage.
+func (s *Session) surfaceIDsLocked() []string {
 	ids := make([]string, 0, len(s.surfaces))
 	for id := range s.surfaces {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+// ForEachSurface calls fn for each active surface. Thread-safe.
+// Used by code that may be called from goroutines outside HandleMessage.
+func (s *Session) ForEachSurface(fn func(surfaceID string, surf *Surface)) {
+	s.mu.Lock()
+	surfs := make(map[string]*Surface, len(s.surfaces))
+	for id, surf := range s.surfaces {
+		surfs[id] = surf
+	}
+	s.mu.Unlock()
+	for id, surf := range surfs {
+		fn(id, surf)
+	}
+}
+
+// forEachSurfaceLocked calls fn for each active surface.
+// Caller must hold s.mu. Used by channel/process managers called from within HandleMessage.
+func (s *Session) forEachSurfaceLocked(fn func(surfaceID string, surf *Surface)) {
+	for id, surf := range s.surfaces {
+		fn(id, surf)
+	}
 }
 
 func (s *Session) handleLoadAssets(la protocol.LoadAssets) {

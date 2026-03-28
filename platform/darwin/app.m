@@ -244,6 +244,7 @@ void JVSetWindowTheme(const char* surfaceID, const char* theme) {
 }
 
 void JVRemoveView(void* view) {
+    if (!view) return;
     NSView *nsView = (__bridge NSView*)view;
     [nsView removeFromSuperview];
 }
@@ -430,6 +431,7 @@ void JVDismissSplash(void) {
 }
 
 void JVSetWindowRootView(const char* surfaceID, void* view, int padding) {
+    if (!view) return;
     NSString *sid = [NSString stringWithUTF8String:surfaceID];
     NSWindow *window = windowMap[sid];
     if (!window) return;

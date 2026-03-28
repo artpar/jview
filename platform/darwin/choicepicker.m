@@ -65,6 +65,7 @@ void* JVCreateChoicePicker(const char** labels, const char** values, int count,
 
 void JVUpdateChoicePicker(void* handle, const char** labels, const char** values, int count,
                            const char* selected) {
+    if (!handle) return;
     NSPopUpButton *popup = (__bridge NSPopUpButton*)handle;
     [popup removeAllItems];
 

@@ -55,6 +55,7 @@ void* JVCreateList(const char* justify, const char* align, int gap, int padding)
 }
 
 void JVUpdateList(void* handle, const char* justify, const char* align, int gap, int padding) {
+    if (!handle) return;
     NSScrollView *scrollView = (__bridge NSScrollView*)handle;
     NSStackView *stack = objc_getAssociatedObject(scrollView, kListStackKey);
     if (!stack) return;
@@ -65,6 +66,7 @@ void JVUpdateList(void* handle, const char* justify, const char* align, int gap,
 }
 
 void JVListSetChildren(void* handle, void** children, int count) {
+    if (!handle) return;
     NSScrollView *scrollView = (__bridge NSScrollView*)handle;
     NSStackView *stack = objc_getAssociatedObject(scrollView, kListStackKey);
     if (!stack) return;

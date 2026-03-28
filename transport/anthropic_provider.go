@@ -63,6 +63,11 @@ func (p *AnthropicProvider) CompletionStream(
 	errs := make(chan error, 1)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				jlog.Errorf("transport", "", "panic in anthropic provider: %v", r)
+			}
+		}()
 		defer close(chunks)
 		defer close(errs)
 

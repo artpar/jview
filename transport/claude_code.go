@@ -281,6 +281,11 @@ func (t *ClaudeCodeTransport) spawnClaude(mcpConfigPath, refPath, prompt string)
 
 	// Read stdout for logging
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				jlog.Errorf("transport", "", "panic in claude-code stdout reader: %v", r)
+			}
+		}()
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 		for scanner.Scan() {

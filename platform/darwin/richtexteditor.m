@@ -511,6 +511,7 @@ void* JVCreateRichTextEditor(const char* content, bool editable, uint64_t callba
 }
 
 void JVUpdateRichTextEditor(void* handle, const char* content, bool editable) {
+    if (!handle) return;
     NSScrollView *scrollView = (__bridge NSScrollView*)handle;
     NSTextView *textView = objc_getAssociatedObject(scrollView, kRTETextViewKey);
     JVRichTextDelegate *delegate = objc_getAssociatedObject(scrollView, kRTEDelegateKey);
@@ -531,6 +532,7 @@ void JVUpdateRichTextEditor(void* handle, const char* content, bool editable) {
 }
 
 void JVRichTextEditorSetFormatCallbackID(void* handle, uint64_t callbackID) {
+    if (!handle) return;
     NSScrollView *scrollView = (__bridge NSScrollView*)handle;
     JVRichTextDelegate *delegate = objc_getAssociatedObject(scrollView, kRTEDelegateKey);
     if (delegate) {

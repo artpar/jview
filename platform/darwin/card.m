@@ -55,6 +55,7 @@ void* JVCreateCard(const char* title, const char* subtitle, int padding) {
 }
 
 void JVUpdateCard(void* handle, const char* title, const char* subtitle, int padding) {
+    if (!handle) return;
     NSBox *box = (__bridge NSBox*)handle;
     NSString *titleStr = [NSString stringWithUTF8String:title];
     NSString *subtitleStr = [NSString stringWithUTF8String:subtitle];
@@ -86,6 +87,7 @@ void JVUpdateCard(void* handle, const char* title, const char* subtitle, int pad
 }
 
 void JVCardSetChildren(void* handle, void** children, int count) {
+    if (!handle) return;
     NSBox *box = (__bridge NSBox*)handle;
     NSStackView *contentStack = objc_getAssociatedObject(box, kContentStackKey);
     if (!contentStack) return;

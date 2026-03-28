@@ -118,6 +118,11 @@ func (s *Server) ListenHTTP(addr string) (int, func(), error) {
 
 	srv := &http.Server{Handler: mux}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				jlog.Errorf("mcp", "", "panic in http server: %v", r)
+			}
+		}()
 		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			jlog.Errorf("mcp", "", "http server error: %v", err)
 		}

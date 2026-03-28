@@ -50,6 +50,7 @@ void* JVCreateTabs(const char** labels, int count, const char* activeTab, uint64
 }
 
 void JVUpdateTabs(void* handle, const char** labels, int count, const char* activeTab) {
+    if (!handle) return;
     NSTabView *tabView = (__bridge NSTabView*)handle;
 
     // Update tab labels — remove excess, add missing, update existing
@@ -89,6 +90,7 @@ void JVUpdateTabs(void* handle, const char** labels, int count, const char* acti
 }
 
 void JVTabsSetChildIDs(void* handle, const char** childIDs, int count) {
+    if (!handle) return;
     NSTabView *tabView = (__bridge NSTabView*)handle;
     NSMutableArray<NSString*> *ids = [NSMutableArray arrayWithCapacity:count];
     for (int i = 0; i < count; i++) {
@@ -98,6 +100,7 @@ void JVTabsSetChildIDs(void* handle, const char** childIDs, int count) {
 }
 
 void JVTabsSetChildren(void* handle, void** children, int count) {
+    if (!handle) return;
     NSTabView *tabView = (__bridge NSTabView*)handle;
 
     // Ensure we have enough tab items

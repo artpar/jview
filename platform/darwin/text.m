@@ -40,6 +40,7 @@ void* JVCreateText(const char* content, const char* variant, int maxLines) {
 }
 
 void JVUpdateText(void* handle, const char* content, const char* variant, int maxLines) {
+    if (!handle) return;
     NSTextField *label = (__bridge NSTextField*)handle;
     NSString *var_ = [NSString stringWithUTF8String:variant];
     label.stringValue = [NSString stringWithUTF8String:content];

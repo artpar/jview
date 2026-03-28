@@ -37,6 +37,7 @@ void JVApplyStyle(void* handle, const char* bg, const char* tc,
     double fontSize, const char* fontWeight, const char* textAlign, double opacity,
     const char* fontFamily, double flexGrow) {
 
+    if (!handle) return;
     NSView *view = (__bridge NSView*)handle;
     NSString *bgStr = [NSString stringWithUTF8String:bg];
     NSString *tcStr = [NSString stringWithUTF8String:tc];

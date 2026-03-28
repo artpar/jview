@@ -122,6 +122,7 @@ static const void *kSavedDiv0Key = &kSavedDiv0Key;
 static const void *kSavedDiv1Key = &kSavedDiv1Key;
 
 void JVUpdateSplitView(void* handle, const char* dividerStyle, bool vertical, int collapsedPane) {
+    if (!handle) return;
     NSSplitView *splitView = (__bridge NSSplitView*)handle;
     splitView.vertical = vertical;
 
@@ -195,6 +196,7 @@ void JVUpdateSplitView(void* handle, const char* dividerStyle, bool vertical, in
 }
 
 void JVSplitViewSetChildren(void* handle, void** children, int count) {
+    if (!handle) return;
     NSSplitView *splitView = (__bridge NSSplitView*)handle;
 
     // Skip if children are the same (prevents resetting divider positions on re-render)

@@ -75,6 +75,7 @@ static NSMenuItem* buildContextMenuItem(NSDictionary *spec, NSMutableArray *targ
 }
 
 void JVAttachContextMenu(void* handle, const char* menuJSON) {
+    if (!handle) return;
     NSView *view = (__bridge NSView*)handle;
 
     NSData *data = [NSData dataWithBytes:menuJSON length:strlen(menuJSON)];

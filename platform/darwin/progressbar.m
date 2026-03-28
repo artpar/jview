@@ -19,6 +19,7 @@ void* JVCreateProgressBar(double min, double max, double value, bool indetermina
 }
 
 void JVUpdateProgressBar(void* handle, double min, double max, double value, bool indeterminate) {
+    if (!handle) return;
     NSProgressIndicator *bar = (__bridge NSProgressIndicator*)handle;
     bar.minValue = min;
     bar.maxValue = max;

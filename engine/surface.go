@@ -196,9 +196,11 @@ func (s *Surface) cleanupComponents(removedIDs []string) {
 }
 
 // CleanupAll unregisters all callbacks and bindings for every component in the tree,
-// and dispatches RemoveView for each component with a handle.
-// Called before surface deletion to prevent stale callback invocations and resource leaks.
-func (s *Surface) CleanupAll() {
+// and optionally dispatches RemoveView for each component with a handle.
+// When skipViewRemoval is true, the caller will handle view cleanup (e.g., DestroyWindow
+// does setSubviews:@[] atomically, avoiding the SIGSEGV from individual removeFromSuperview
+// calls that leave dangling pointers between dispatch_async blocks).
+func (s *Surface) CleanupAll(skipViewRemoval bool) {
 	allIDs := s.tree.All()
 	for _, id := range allIDs {
 		if events, exists := s.activeCallbacks[id]; exists {
@@ -211,15 +213,17 @@ func (s *Surface) CleanupAll() {
 		delete(s.validationErrors, id)
 	}
 
-	// Dispatch RemoveView on main thread for components that have handles
-	s.dispatch.RunOnMain(func() {
-		for _, id := range allIDs {
-			handle := s.rend.GetHandle(s.id, id)
-			if handle != 0 {
-				s.rend.RemoveView(s.id, id, handle)
+	if !skipViewRemoval {
+		// Dispatch RemoveView on main thread for components that have handles
+		s.dispatch.RunOnMain(func() {
+			for _, id := range allIDs {
+				handle := s.rend.GetHandle(s.id, id)
+				if handle != 0 {
+					s.rend.RemoveView(s.id, id, handle)
+				}
 			}
-		}
-	})
+		})
+	}
 }
 
 // HandleUpdateDataModel applies data model operations and re-renders affected components.

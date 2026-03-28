@@ -2,6 +2,7 @@ package transport
 
 import (
 	"encoding/json"
+	"jview/jlog"
 	"jview/protocol"
 	"time"
 )
@@ -35,6 +36,11 @@ func (t *IntervalTransport) Errors() <-chan error {
 
 func (t *IntervalTransport) Start() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				jlog.Errorf("transport", "", "panic in interval transport: %v", r)
+			}
+		}()
 		ticker := time.NewTicker(t.interval)
 		defer ticker.Stop()
 		defer close(t.msgs)

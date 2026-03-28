@@ -65,6 +65,7 @@ void* JVCreateDateTimeInput(bool enableDate, bool enableTime, const char* value,
 }
 
 void JVUpdateDateTimeInput(void* handle, bool enableDate, bool enableTime, const char* value) {
+    if (!handle) return;
     NSDatePicker *picker = (__bridge NSDatePicker*)handle;
     picker.datePickerElements = elementsForFlags(enableDate, enableTime);
 

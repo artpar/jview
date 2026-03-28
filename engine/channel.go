@@ -162,16 +162,12 @@ func (cm *ChannelManager) Publish(pub protocol.Publish) error {
 
 	// Write to /channels/{id}/value on all surfaces
 	valuePath := fmt.Sprintf("/channels/%s/value", pub.ChannelID)
-	for _, sid := range cm.sess.SurfaceIDs() {
-		surf := cm.sess.GetSurface(sid)
-		if surf == nil {
-			continue
-		}
+	cm.sess.forEachSurfaceLocked(func(sid string, surf *Surface) {
 		surf.HandleUpdateDataModel(protocol.UpdateDataModel{
 			SurfaceID: sid,
 			Ops:       []protocol.DataModelOp{{Op: "replace", Path: valuePath, Value: pub.Value}},
 		})
-	}
+	})
 
 	// Deliver to subscribers
 	switch mode {
@@ -227,29 +223,23 @@ func (cm *ChannelManager) CleanupProcess(processID string) {
 	}
 }
 
-// setStatusLocked writes channel status to all surfaces. Must be called with mu held.
+// setStatusLocked writes channel status to all surfaces.
 func (cm *ChannelManager) setStatusLocked(channelID, status string) {
 	path := fmt.Sprintf("/channels/%s/status", channelID)
-	for _, sid := range cm.sess.SurfaceIDs() {
-		surf := cm.sess.GetSurface(sid)
-		if surf != nil {
-			surf.HandleUpdateDataModel(protocol.UpdateDataModel{
-				SurfaceID: sid,
-				Ops:       []protocol.DataModelOp{{Op: "replace", Path: path, Value: status}},
-			})
-		}
-	}
+	cm.sess.forEachSurfaceLocked(func(sid string, surf *Surface) {
+		surf.HandleUpdateDataModel(protocol.UpdateDataModel{
+			SurfaceID: sid,
+			Ops:       []protocol.DataModelOp{{Op: "replace", Path: path, Value: status}},
+		})
+	})
 }
 
 // deliverToPath writes a value to a DataModel path on all surfaces.
 func (cm *ChannelManager) deliverToPath(targetPath string, value interface{}) {
-	for _, sid := range cm.sess.SurfaceIDs() {
-		surf := cm.sess.GetSurface(sid)
-		if surf != nil {
-			surf.HandleUpdateDataModel(protocol.UpdateDataModel{
-				SurfaceID: sid,
-				Ops:       []protocol.DataModelOp{{Op: "replace", Path: targetPath, Value: value}},
-			})
-		}
-	}
+	cm.sess.forEachSurfaceLocked(func(sid string, surf *Surface) {
+		surf.HandleUpdateDataModel(protocol.UpdateDataModel{
+			SurfaceID: sid,
+			Ops:       []protocol.DataModelOp{{Op: "replace", Path: targetPath, Value: value}},
+		})
+	})
 }
