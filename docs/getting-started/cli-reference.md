@@ -1,0 +1,125 @@
+---
+layout: default
+title: CLI Reference
+parent: Getting Started
+nav_order: 3
+---
+
+# CLI Reference
+
+## Modes
+
+Canopy runs in several modes depending on the arguments you pass:
+
+| Mode | Command | Description |
+|:-----|:--------|:------------|
+| File | `canopy app.jsonl` | Run a JSONL file as a native app |
+| Directory | `canopy myapp/` | Run all `.jsonl` files in a directory |
+| Prompt | `canopy --prompt "..." --llm anthropic` | Generate UI from an LLM prompt |
+| Claude Code | `canopy --claude-code "..."` | Generate via Claude Code with MCP tool access |
+| MCP Server | `canopy mcp [file.jsonl]` | Start as an embedded MCP server on stdin/stdout |
+| Tray | `canopy` (no args) | Menubar-only mode with system tray icon |
+| Package | `canopy pkg <cmd>` | Package management (install, publish, search) |
+
+## Flags
+
+All flags are optional. They modify behavior across modes.
+
+| Flag | Default | Description |
+|:-----|:--------|:------------|
+| `--llm` | `anthropic` | LLM provider: `anthropic`, `openai`, `gemini`, `ollama`, `deepseek`, `groq`, `mistral` |
+| `--model` | `claude-opus-4-6` | Model name to use for generation |
+| `--prompt` | | Text description of the UI to build |
+| `--prompt-file` | | Read prompt from a file (overrides `--prompt`) |
+| `--mode` | `tools` | LLM mode: `tools` (structured) or `raw` (freeform) |
+| `--api-key` | | API key (overrides environment variable) |
+| `--regenerate` | `false` | Force a fresh LLM call, ignoring cached JSONL |
+| `--generate-only` | `false` | Generate JSONL and exit without opening a window |
+| `--claude-code` | | Prompt for Claude Code subprocess |
+| `--save-component` | | Save generated UI as a reusable library component |
+| `--watch` | `false` | Watch JSONL files for changes and reload automatically |
+| `--ffi-config` | | Path to FFI convention file (JSON) for native function calls |
+| `--mcp-http` | | Also listen for MCP over HTTP (e.g. `localhost:8080`) |
+
+## Package Commands
+
+Manage reusable components shared through GitHub:
+
+| Command | Description |
+|:--------|:------------|
+| `canopy pkg login` | Authenticate with GitHub |
+| `canopy pkg search <query>` | Search for packages |
+| `canopy pkg info <owner/repo>` | Show package details |
+| `canopy pkg install <owner/repo> [@version]` | Install a package |
+| `canopy pkg uninstall <owner/name>` | Uninstall a package |
+| `canopy pkg update [<owner/name>]` | Update one or all packages |
+| `canopy pkg list` | List installed packages |
+| `canopy pkg publish [path] [--repo=owner/repo]` | Publish a package to GitHub |
+
+## Make Targets
+
+Common targets for building and running Canopy:
+
+| Target | Description |
+|:-------|:------------|
+| `make build` | Build the `build/canopy` binary |
+| `make app` | Build the `Canopy.app` bundle (includes URL scheme and file association) |
+| `make run-app A=calculator` | Run a sample app by name |
+| `make generate-app A=calculator` | Generate a sample app's JSONL without opening a window |
+| `make regen-app A=calculator` | Force-regenerate a sample app from its prompt |
+| `make generate-apps` | Generate all sample apps headlessly |
+| `make clean-apps` | Remove all cached sample app JSONL files |
+
+## Environment Variables
+
+API keys can be set as environment variables or in a `.env` file in the project root:
+
+| Variable | Provider |
+|:---------|:---------|
+| `ANTHROPIC_API_KEY` | Anthropic (Claude) |
+| `OPENAI_API_KEY` | OpenAI (GPT) |
+| `GEMINI_API_KEY` | Google (Gemini) |
+| `GROQ_API_KEY` | Groq |
+| `DEEPSEEK_API_KEY` | DeepSeek |
+| `MISTRAL_API_KEY` | Mistral |
+
+Ollama requires no API key --- it connects to `localhost:11434` by default.
+
+## Examples
+
+```bash
+# Run a JSONL file
+build/canopy testdata/contact_form.jsonl
+
+# Run with file watching (auto-reload on save)
+build/canopy --watch testdata/contact_form.jsonl
+
+# Generate from a prompt
+build/canopy --prompt "Build a todo list" --llm anthropic
+
+# Generate and save without opening a window
+build/canopy --prompt "Build a dashboard" --generate-only
+
+# Use a different model
+build/canopy --prompt "Build a chat app" --llm openai --model gpt-4o
+
+# Use Ollama locally
+build/canopy --prompt "Build a timer" --llm ollama --model llama3
+
+# Generate with Claude Code (iterative, uses MCP tools)
+build/canopy --claude-code "Build a notes app with sidebar and rich text"
+
+# Start as MCP server
+build/canopy mcp
+
+# Start as MCP server with an initial JSONL file
+build/canopy mcp testdata/contact_form.jsonl
+
+# Start MCP server with HTTP endpoint
+build/canopy --mcp-http localhost:8080 mcp
+
+# Package management
+canopy pkg search "todo"
+canopy pkg install artpar/canopy-components
+canopy pkg list
+```
