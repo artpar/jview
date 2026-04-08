@@ -23,6 +23,7 @@ type Manifest struct {
 	Icon         string            `json:"icon,omitempty"`
 	Entry        string            `json:"entry"`
 	Prompt       string            `json:"prompt,omitempty"`
+	BundleID     string            `json:"bundleId,omitempty"`
 	Keywords     []string          `json:"keywords,omitempty"`
 	Dependencies map[string]string `json:"dependencies,omitempty"`
 }

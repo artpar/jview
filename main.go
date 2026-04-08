@@ -90,6 +90,12 @@ func main() {
 		return
 	}
 
+	// Handle "canopy bundle <app-path>" — create macOS .app bundle (pure Go, no AppKit)
+	if len(os.Args) >= 2 && os.Args[1] == "bundle" {
+		cmd.RunBundle(os.Args[2:])
+		return
+	}
+
 	ffiConfigPath := flag.String("ffi-config", "", "Path to FFI convention file (JSON) for native function calls")
 	llmProvider := flag.String("llm", "anthropic", "LLM provider: anthropic, openai, gemini, ollama, deepseek, groq, mistral")
 	model := flag.String("model", "claude-opus-4-6", "Model name (default: claude-opus-4-6)")
@@ -136,6 +142,27 @@ func main() {
 	var recorder *engine.Recorder
 
 	args := flag.Args()
+
+	// Auto-detect bundled app: if running inside a .app bundle with
+	// Resources/app/, load it as the default input and run as a normal dock app.
+	bundledApp := false
+	if len(args) == 0 && *prompt == "" && *claudeCode == "" {
+		if exePath, err := os.Executable(); err == nil {
+			exePath, _ = filepath.EvalSymlinks(exePath)
+			macosDir := filepath.Dir(exePath)
+			contentsDir := filepath.Dir(macosDir)
+			if filepath.Base(macosDir) == "MacOS" &&
+				filepath.Base(contentsDir) == "Contents" &&
+				strings.HasSuffix(filepath.Dir(contentsDir), ".app") {
+				resourceApp := filepath.Join(contentsDir, "Resources", "app")
+				if info, err := os.Stat(resourceApp); err == nil && info.IsDir() {
+					args = []string{resourceApp}
+					bundledApp = true
+				}
+			}
+		}
+	}
+
 	if *claudeCode != "" {
 		// Determine cache paths for Claude Code prompt
 		cachePrompt = *claudeCode
@@ -369,19 +396,27 @@ func main() {
 	// Interactive mode: initialize platform and engine
 	darwin.AppInit()
 
-	// Always start in menubar mode (system tray)
-	darwin.SetAppMode("menubar", "app.dashed", "Canopy", 0)
+	// Bundled apps run as normal dock apps; standalone Canopy runs as menubar tray
+	if bundledApp {
+		darwin.SetAppMode("normal", "", "", 0)
+	} else {
+		darwin.SetAppMode("menubar", "app.dashed", "Canopy", 0)
 
-	// Scan sample_apps/ for the Apps submenu
-	sampleApps := scanSampleApps()
-	if len(sampleApps) > 0 {
-		darwin.SetStatusMenuApps(sampleApps)
+		// Scan sample_apps/ for the Apps submenu
+		sampleApps := scanSampleApps()
+		if len(sampleApps) > 0 {
+			darwin.SetStatusMenuApps(sampleApps)
+		}
 	}
 
 	// Show splash only when loading a fixture/prompt (not bare startup)
 	hasForegroundWork := tr != nil
 	if hasForegroundWork {
-		darwin.ShowSplashWindow("Canopy", 400, 200)
+		splashTitle := "Canopy"
+		if bundledApp {
+			splashTitle = bundledAppName(args[0])
+		}
+		darwin.ShowSplashWindow(splashTitle, 400, 200)
 	}
 	disp := darwin.NewDispatcher()
 	rend := darwin.NewRenderer()
@@ -1058,6 +1093,21 @@ func scanSampleApps() []darwin.StatusMenuApp {
 	}
 
 	return apps
+}
+
+// bundledAppName reads the app name from canopy.json in the given directory,
+// falling back to the directory name.
+func bundledAppName(appDir string) string {
+	data, err := os.ReadFile(filepath.Join(appDir, "canopy.json"))
+	if err == nil {
+		var m struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(data, &m) == nil && m.Name != "" {
+			return m.Name
+		}
+	}
+	return titleCase(filepath.Base(appDir))
 }
 
 func titleCase(name string) string {

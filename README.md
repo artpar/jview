@@ -30,11 +30,15 @@ cd canopy
 make build
 ```
 
-Or build a proper `.app` bundle (registers `canopy://` URL scheme and `.jsonl` file association):
+Bundle any Canopy app into a standalone `.app`:
 
 ```bash
-make app          # -> build/canopy.app
+canopy bundle myapp/                        # -> MyApp.app
+canopy bundle -o Notes.app sample_apps/notes  # custom output path
+canopy bundle --icon icon.icns myapp/       # with custom icon
 ```
+
+The bundled `.app` is self-contained — double-click to launch, no CLI needed.
 
 ## Try it
 
@@ -294,6 +298,13 @@ myapp/
 {"type":"updateComponents","surfaceId":"main","components":[...]}
 ```
 
+Add a `canopy.json` manifest for bundling metadata:
+```json
+{"name":"My App","version":"1.0.0","type":"app","entry":"app.jsonl","icon":"icon.icns","bundleId":"com.example.myapp"}
+```
+
+Then `canopy bundle myapp/` creates `My App.app` — a standalone macOS app that runs without the CLI.
+
 ## How it works
 
 ```
@@ -310,7 +321,7 @@ The protocol is [A2UI](https://a2ui.org) JSONL. Each line is a JSON message: `cr
 
 ```bash
 make build         # build binary to build/canopy
-make app           # build macOS .app bundle
+canopy bundle myapp/  # create standalone .app from any Canopy app
 make test          # headless unit + integration tests (387 tests, -race)
 make verify        # screenshot every fixture (48 fixtures)
 make check         # test + verify (the gate before commits)
@@ -325,7 +336,8 @@ renderer/          Renderer interface (platform-agnostic) + mock for tests
 platform/darwin/   CGo + ObjC implementation of Renderer (25 components + native APIs)
 transport/         file, directory, watch, LLM, Claude Code, interval transports
 mcp/               MCP server (JSON-RPC 2.0, stdin/stdout + HTTP)
-packaging/         .app bundle resources (Info.plist)
+cmd/               CLI subcommands (pkg, bundle)
+pkg/               package registry and GitHub integration
 testdata/          48 JSONL fixtures
 sample_apps/       10 LLM-generated apps
 ```

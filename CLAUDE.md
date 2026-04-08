@@ -324,7 +324,7 @@ Reliability, process model, channels, always-on MCP.
 | Process model (createProcess/stopProcess) | infra | high | **done** |
 | Channel primitives (pub/sub, broadcast/queue) | infra | high | **done** |
 | Always-on MCP server | infra | high | **done** |
-| macOS .app bundle packaging | infra | low | not started |
+| macOS .app bundle packaging | infra | low | **done** |
 
 ### Media Capture — COMPLETE
 2 new components, 6 new evaluator functions, 8 new MCP tools.
