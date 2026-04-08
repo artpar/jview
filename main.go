@@ -443,6 +443,7 @@ func main() {
 	// Pre-declare pm and cm so the process factory closure can capture them
 	var pm *engine.ProcessManager
 	var cm *engine.ChannelManager
+	var activeProcessLLM *transport.LLMTransport
 
 	// Set up process manager with transport factory
 	pm = engine.NewProcessManager(sess, func(cfg protocol.ProcessTransportConfig) (engine.ProcessTransport, error) {
@@ -462,13 +463,16 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("create LLM provider: %w", err)
 			}
-			llmCfg := transport.LLMConfig{
-				Provider: provider,
-				Model:    cfg.Model,
-				Prompt:   cfg.Prompt,
-				Mode:     "tools",
-			}
-			return transport.NewLLMTransport(llmCfg), nil
+			lt := transport.NewLLMTransport(transport.LLMConfig{
+				Provider:     provider,
+				Model:        cfg.Model,
+				Prompt:       cfg.Prompt,
+				Mode:         "tools",
+				LibraryBlock: lib.ComponentListForPrompt(),
+			})
+			activeProcessLLM = lt
+			disp.RunOnMain(func() { darwin.SetFollowUpEnabled(true) })
+			return lt, nil
 		case "claude-code":
 			cc := transport.NewClaudeCodeTransport(transport.ClaudeCodeConfig{
 				Prompt: cfg.Prompt,
@@ -584,12 +588,31 @@ func main() {
 	darwin.OnStatusMenuAppClicked = func(appPath string) {
 		jlog.Infof("main", "", "launching app: %s", appPath)
 		processID := "app_" + filepath.Base(appPath)
-		err := pm.Create(protocol.CreateProcess{
-			ProcessID: processID,
-			Transport: protocol.ProcessTransportConfig{
+
+		// Check for prompt.txt to enable LLM-powered launch
+		promptPath := filepath.Join(appPath, "prompt.txt")
+		if info, err := os.Stat(appPath); err == nil && !info.IsDir() {
+			promptPath = filepath.Join(filepath.Dir(appPath), "prompt.txt")
+		}
+
+		var tcfg protocol.ProcessTransportConfig
+		if promptData, err := os.ReadFile(promptPath); err == nil && len(promptData) > 0 {
+			tcfg = protocol.ProcessTransportConfig{
+				Type:     "llm",
+				Provider: *llmProvider,
+				Model:    *model,
+				Prompt:   string(promptData),
+			}
+		} else {
+			tcfg = protocol.ProcessTransportConfig{
 				Type: "file",
 				Path: appPath,
-			},
+			}
+		}
+
+		err := pm.Create(protocol.CreateProcess{
+			ProcessID: processID,
+			Transport: tcfg,
 		})
 		if err != nil {
 			jlog.Errorf("main", "", "failed to launch app %s: %v", appPath, err)
@@ -692,21 +715,24 @@ func main() {
 		}
 	}
 
-	// Wire Cmd+L follow-up prompt for LLM transport
+	// Wire Cmd+L follow-up prompt — unified handler for all transport types
 	if llmTr != nil {
-		lt := llmTr
 		darwin.SetFollowUpEnabled(true)
-		darwin.OnFollowUpTriggered = func() {
-			go func() {
-				disp.RunOnMain(func() { darwin.SetFollowUpEnabled(false) })
-				result := darwin.ShowFollowUpPanel()
-				disp.RunOnMain(func() { darwin.SetFollowUpEnabled(true) })
-				if result == "" {
-					return
-				}
-				lt.SendFollowUp(result)
-			}()
-		}
+	}
+	darwin.OnFollowUpTriggered = func() {
+		go func() {
+			disp.RunOnMain(func() { darwin.SetFollowUpEnabled(false) })
+			result := darwin.ShowFollowUpPanel()
+			disp.RunOnMain(func() { darwin.SetFollowUpEnabled(true) })
+			if result == "" {
+				return
+			}
+			if llmTr != nil {
+				llmTr.SendFollowUp(result)
+			} else if activeProcessLLM != nil {
+				activeProcessLLM.SendFollowUp(result)
+			}
+		}()
 	}
 
 	// Wire Cmd+L follow-up prompt for Claude Code transport
