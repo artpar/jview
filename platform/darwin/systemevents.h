@@ -23,4 +23,16 @@ void JVStopLocaleObserver(void);
 void JVStartClipboardObserver(int intervalMs);
 void JVStopClipboardObserver(void);
 
+// Start observing network reachability changes.
+void JVStartNetworkObserver(void);
+void JVStopNetworkObserver(void);
+
+// Start observing accessibility changes (reduce motion, reduce transparency, etc.).
+void JVStartAccessibilityObserver(void);
+void JVStopAccessibilityObserver(void);
+
+// Start observing thermal state changes.
+void JVStartThermalObserver(void);
+void JVStopThermalObserver(void);
+
 #endif

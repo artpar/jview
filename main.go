@@ -515,6 +515,9 @@ func main() {
 		darwin.StartDisplayObserver()
 		darwin.StartLocaleObserver()
 		darwin.StartClipboardObserver(500) // poll every 500ms
+		darwin.StartNetworkObserver()
+		darwin.StartAccessibilityObserver()
+		darwin.StartThermalObserver()
 	})
 
 	// Wire status bar menu handlers
@@ -972,6 +975,9 @@ func runMCP(args []string) {
 		darwin.StartDisplayObserver()
 		darwin.StartLocaleObserver()
 		darwin.StartClipboardObserver(500)
+		darwin.StartNetworkObserver()
+		darwin.StartAccessibilityObserver()
+		darwin.StartThermalObserver()
 	})
 
 	// If a file arg is provided, load it as initial UI

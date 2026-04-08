@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#import <SystemConfiguration/SystemConfiguration.h>
 #include "systemevents.h"
 
 extern void GoSystemEvent(const char* event, const char* data);
@@ -159,5 +160,121 @@ void JVStopClipboardObserver(void) {
     if (clipboardTimer) {
         dispatch_source_cancel(clipboardTimer);
         clipboardTimer = nil;
+    }
+}
+
+// --- Network Reachability ---
+
+static SCNetworkReachabilityRef reachabilityRef = NULL;
+
+static void reachabilityCallback(SCNetworkReachabilityRef target,
+                                  SCNetworkReachabilityFlags flags,
+                                  void *info) {
+    BOOL reachable = (flags & kSCNetworkFlagsReachable) != 0;
+    BOOL needsConnection = (flags & kSCNetworkFlagsConnectionRequired) != 0;
+    BOOL isWWAN = NO;  // macOS doesn't have WWAN
+
+    NSString *status = @"unreachable";
+    NSString *type = @"none";
+    if (reachable && !needsConnection) {
+        status = @"reachable";
+        type = @"wifi"; // macOS: either wifi or ethernet
+    }
+
+    NSString *json = [NSString stringWithFormat:
+        @"{\"status\":\"%@\",\"type\":\"%@\",\"wwan\":%s}",
+        status, type, isWWAN ? "true" : "false"];
+    GoSystemEvent("system.network.reachability", [json UTF8String]);
+}
+
+void JVStartNetworkObserver(void) {
+    if (reachabilityRef) return;
+
+    struct sockaddr_in zeroAddr;
+    memset(&zeroAddr, 0, sizeof(zeroAddr));
+    zeroAddr.sin_len = sizeof(zeroAddr);
+    zeroAddr.sin_family = AF_INET;
+
+    reachabilityRef = SCNetworkReachabilityCreateWithAddress(NULL, (const struct sockaddr *)&zeroAddr);
+    if (!reachabilityRef) return;
+
+    SCNetworkReachabilitySetCallback(reachabilityRef, reachabilityCallback, NULL);
+    SCNetworkReachabilityScheduleWithRunLoop(reachabilityRef, CFRunLoopGetMain(), kCFRunLoopDefaultMode);
+}
+
+void JVStopNetworkObserver(void) {
+    if (reachabilityRef) {
+        SCNetworkReachabilityUnscheduleFromRunLoop(reachabilityRef, CFRunLoopGetMain(), kCFRunLoopDefaultMode);
+        CFRelease(reachabilityRef);
+        reachabilityRef = NULL;
+    }
+}
+
+// --- Accessibility Observer ---
+
+static id accessibilityReduceMotionObserver = nil;
+static id accessibilityReduceTransparencyObserver = nil;
+static id accessibilityIncreaseContrastObserver = nil;
+
+void JVStartAccessibilityObserver(void) {
+    if (accessibilityReduceMotionObserver) return;
+
+    NSWorkspace *ws = [NSWorkspace sharedWorkspace];
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+
+    accessibilityReduceMotionObserver = [nc
+        addObserverForName:NSWorkspaceAccessibilityDisplayOptionsDidChangeNotification
+                    object:ws
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification * _Nonnull note) {
+        BOOL reduceMotion = [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldReduceMotion];
+        BOOL reduceTransparency = [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldReduceTransparency];
+        BOOL increaseContrast = [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldIncreaseContrast];
+
+        NSString *json = [NSString stringWithFormat:
+            @"{\"reduceMotion\":%s,\"reduceTransparency\":%s,\"increaseContrast\":%s}",
+            reduceMotion ? "true" : "false",
+            reduceTransparency ? "true" : "false",
+            increaseContrast ? "true" : "false"];
+        GoSystemEvent("system.accessibility", [json UTF8String]);
+    }];
+}
+
+void JVStopAccessibilityObserver(void) {
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    if (accessibilityReduceMotionObserver) {
+        [nc removeObserver:accessibilityReduceMotionObserver];
+        accessibilityReduceMotionObserver = nil;
+    }
+}
+
+// --- Thermal State Observer ---
+
+static id thermalObserver = nil;
+
+void JVStartThermalObserver(void) {
+    if (thermalObserver) return;
+
+    thermalObserver = [[NSNotificationCenter defaultCenter]
+        addObserverForName:NSProcessInfoThermalStateDidChangeNotification
+                    object:nil
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification * _Nonnull note) {
+        NSString *state = @"nominal";
+        switch ([NSProcessInfo processInfo].thermalState) {
+            case NSProcessInfoThermalStateNominal: state = @"nominal"; break;
+            case NSProcessInfoThermalStateFair: state = @"fair"; break;
+            case NSProcessInfoThermalStateSerious: state = @"serious"; break;
+            case NSProcessInfoThermalStateCritical: state = @"critical"; break;
+        }
+        NSString *json = [NSString stringWithFormat:@"{\"state\":\"%@\"}", state];
+        GoSystemEvent("system.thermal", [json UTF8String]);
+    }];
+}
+
+void JVStopThermalObserver(void) {
+    if (thermalObserver) {
+        [[NSNotificationCenter defaultCenter] removeObserver:thermalObserver];
+        thermalObserver = nil;
     }
 }

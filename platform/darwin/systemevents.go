@@ -2,7 +2,7 @@ package darwin
 
 /*
 #cgo CFLAGS: -x objective-c -fobjc-arc
-#cgo LDFLAGS: -framework Cocoa
+#cgo LDFLAGS: -framework Cocoa -framework SystemConfiguration
 
 #include <stdlib.h>
 #include "systemevents.h"
@@ -55,3 +55,21 @@ func StartClipboardObserver(intervalMs int) { C.JVStartClipboardObserver(C.int(i
 
 // StopClipboardObserver stops clipboard polling.
 func StopClipboardObserver() { C.JVStopClipboardObserver() }
+
+// StartNetworkObserver begins watching for network reachability changes.
+func StartNetworkObserver() { C.JVStartNetworkObserver() }
+
+// StopNetworkObserver stops watching network changes.
+func StopNetworkObserver() { C.JVStopNetworkObserver() }
+
+// StartAccessibilityObserver begins watching for accessibility setting changes.
+func StartAccessibilityObserver() { C.JVStartAccessibilityObserver() }
+
+// StopAccessibilityObserver stops watching accessibility changes.
+func StopAccessibilityObserver() { C.JVStopAccessibilityObserver() }
+
+// StartThermalObserver begins watching for thermal state changes.
+func StartThermalObserver() { C.JVStartThermalObserver() }
+
+// StopThermalObserver stops watching thermal changes.
+func StopThermalObserver() { C.JVStopThermalObserver() }
