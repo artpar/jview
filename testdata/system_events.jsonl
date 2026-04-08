@@ -1,0 +1,14 @@
+{"type":"createSurface","surfaceId":"main","title":"System Events Demo","width":600,"height":400}
+{"type":"on","surfaceId":"main","id":"appearance","event":"system.appearance","handler":{"dataPath":"/system/appearance"}}
+{"type":"on","surfaceId":"main","id":"clipboard","event":"system.clipboard.changed","handler":{"action":{"event":{"name":"clipboardChanged"}}}}
+{"type":"on","surfaceId":"main","id":"power-sleep","event":"system.power.sleep","handler":{"dataPath":"/system/power","dataValue":"sleep"}}
+{"type":"on","surfaceId":"main","id":"power-wake","event":"system.power.wake","handler":{"dataPath":"/system/power","dataValue":"awake"}}
+{"type":"on","surfaceId":"main","id":"display","event":"system.display.changed","handler":{"dataPath":"/system/display"}}
+{"type":"on","surfaceId":"main","id":"locale","event":"system.locale.changed","handler":{"dataPath":"/system/locale"}}
+{"type":"component","surfaceId":"main","componentId":"root","type":"Column","props":{"padding":20,"spacing":12}}
+{"type":"component","surfaceId":"main","componentId":"title","type":"Text","props":{"content":"System Events","style":"title","parentId":"root"}}
+{"type":"component","surfaceId":"main","componentId":"appearance-label","type":"Text","props":{"content":{"$expr":"'Appearance: ' + str(get('/system/appearance/appearance', 'unknown'))"},"parentId":"root"}}
+{"type":"component","surfaceId":"main","componentId":"power-label","type":"Text","props":{"content":{"$expr":"'Power: ' + str(get('/system/power', 'awake'))"},"parentId":"root"}}
+{"type":"component","surfaceId":"main","componentId":"display-label","type":"Text","props":{"content":{"$expr":"'Screens: ' + str(get('/system/display/screenCount', '?'))"},"parentId":"root"}}
+{"type":"component","surfaceId":"main","componentId":"locale-label","type":"Text","props":{"content":{"$expr":"'Locale: ' + str(get('/system/locale/locale', 'unknown'))"},"parentId":"root"}}
+{"type":"component","surfaceId":"main","componentId":"info","type":"Text","props":{"content":"Change system dark mode, copy something, or sleep/wake to see events.","style":"footnote","color":"#888888","parentId":"root"}}

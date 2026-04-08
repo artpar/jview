@@ -53,6 +53,9 @@ func (r *DarwinRenderer) CreateWindow(spec renderer.WindowSpec) {
 
 	C.JVCreateWindow(cTitle, C.int(spec.Width), C.int(spec.Height), cSID, cBg)
 
+	// Install window delegate for window events (resize, move, close, etc.)
+	installWindowDelegate(spec.SurfaceID)
+
 	r.mu.Lock()
 	r.surfacePadding[spec.SurfaceID] = spec.Padding
 	r.mu.Unlock()
@@ -83,6 +86,9 @@ func (r *DarwinRenderer) DestroyWindow(surfaceID string) {
 	delete(r.callbacks, surfaceID)
 	r.destroyed[surfaceID] = true
 	r.mu.Unlock()
+
+	// Remove window delegate before destruction
+	removeWindowDelegate(surfaceID)
 
 	cSID := C.CString(surfaceID)
 	defer C.free(unsafe.Pointer(cSID))

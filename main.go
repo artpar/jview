@@ -503,6 +503,20 @@ func main() {
 		sess.EventManager().Fire(event, surfaceID, data)
 	})
 
+	// Wire system events from native observers → EventManager
+	darwin.SetSystemEventHandler(func(event, data string) {
+		sess.EventManager().Fire(event, "", data)
+	})
+
+	// Start always-on system observers (lightweight NSNotificationCenter subscriptions)
+	disp.RunOnMain(func() {
+		darwin.StartAppearanceObserver()
+		darwin.StartPowerObserver()
+		darwin.StartDisplayObserver()
+		darwin.StartLocaleObserver()
+		darwin.StartClipboardObserver(500) // poll every 500ms
+	})
+
 	// Wire status bar menu handlers
 	darwin.OnStatusMenuAppClicked = func(appPath string) {
 		jlog.Infof("main", "", "launching app: %s", appPath)
@@ -927,6 +941,20 @@ func runMCP(args []string) {
 	// Wire window events from native delegate → EventManager
 	darwin.SetWindowEventHandler(func(surfaceID, event, data string) {
 		sess.EventManager().Fire(event, surfaceID, data)
+	})
+
+	// Wire system events from native observers → EventManager
+	darwin.SetSystemEventHandler(func(event, data string) {
+		sess.EventManager().Fire(event, "", data)
+	})
+
+	// Start always-on system observers
+	disp.RunOnMain(func() {
+		darwin.StartAppearanceObserver()
+		darwin.StartPowerObserver()
+		darwin.StartDisplayObserver()
+		darwin.StartLocaleObserver()
+		darwin.StartClipboardObserver(500)
 	})
 
 	// If a file arg is provided, load it as initial UI

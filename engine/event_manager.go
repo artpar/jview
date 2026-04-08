@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 // EventSubscription represents a single event subscription from an "on" message.
@@ -81,6 +83,8 @@ func (em *EventManager) startEventSource(sub *EventSubscription, config map[stri
 	switch sub.Event {
 	case "system.timer":
 		em.startTimer(sub, config)
+	case "system.fs.watch":
+		em.startFSWatch(sub, config)
 	}
 }
 
@@ -121,6 +125,88 @@ func (em *EventManager) startTimer(sub *EventSubscription, config map[string]int
 				tick++
 				data := fmt.Sprintf(`{"tick":%d,"elapsed":%d}`, tick, tick*intervalMs)
 				em.Fire(event, surfaceID, data)
+			}
+		}
+	}()
+}
+
+// startFSWatch starts a filesystem watcher for the given paths.
+func (em *EventManager) startFSWatch(sub *EventSubscription, config map[string]interface{}) {
+	var paths []string
+	if config != nil {
+		if v, ok := config["paths"]; ok {
+			switch pv := v.(type) {
+			case []interface{}:
+				for _, p := range pv {
+					if s, ok := p.(string); ok {
+						paths = append(paths, s)
+					}
+				}
+			case string:
+				paths = append(paths, pv)
+			}
+		}
+		if v, ok := config["path"]; ok {
+			if s, ok := v.(string); ok {
+				paths = append(paths, s)
+			}
+		}
+	}
+	if len(paths) == 0 {
+		jlog.Errorf("events", "", "system.fs.watch: no paths specified")
+		return
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		jlog.Errorf("events", "", "system.fs.watch: failed to create watcher: %v", err)
+		return
+	}
+
+	for _, p := range paths {
+		if err := watcher.Add(p); err != nil {
+			jlog.Errorf("events", "", "system.fs.watch: failed to watch %q: %v", p, err)
+		}
+	}
+
+	done := make(chan struct{})
+	sub.Cancel = func() {
+		close(done)
+		watcher.Close()
+	}
+
+	surfaceID := sub.SurfaceID
+	event := sub.Event
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case ev, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				op := "unknown"
+				switch {
+				case ev.Has(fsnotify.Create):
+					op = "created"
+				case ev.Has(fsnotify.Write):
+					op = "modified"
+				case ev.Has(fsnotify.Remove):
+					op = "removed"
+				case ev.Has(fsnotify.Rename):
+					op = "renamed"
+				case ev.Has(fsnotify.Chmod):
+					op = "chmod"
+				}
+				data := fmt.Sprintf(`{"path":%q,"event":%q}`, ev.Name, op)
+				em.Fire(event, surfaceID, data)
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				jlog.Errorf("events", "", "system.fs.watch error: %v", err)
 			}
 		}
 	}()

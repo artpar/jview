@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.21.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/mozilla-ai/any-llm-go v0.8.0
 )

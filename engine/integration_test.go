@@ -3,6 +3,7 @@ package engine
 import (
 	"canopy/protocol"
 	"canopy/renderer"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -2073,5 +2074,170 @@ func TestOnMessageCleanupOnSurfaceDelete(t *testing.T) {
 	em.mu.Unlock()
 	if exists {
 		t.Fatal("subscription should have been cleaned up with surface deletion")
+	}
+}
+
+func TestWindowResizeEvent(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"T","width":800,"height":600}
+{"type":"on","surfaceId":"main","id":"resize-1","event":"window.resize","handler":{"dataPath":"/window/size"}}`)
+
+	sess.EventManager().Fire("window.resize", "main", `{"width":1024,"height":768}`)
+
+	sess.mu.Lock()
+	surf := sess.surfaces["main"]
+	sess.mu.Unlock()
+
+	val, found := surf.dm.Get("/window/size")
+	if !found {
+		t.Fatal("expected /window/size to be set after resize event")
+	}
+	m, ok := val.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map, got %T", val)
+	}
+	if w, _ := m["width"].(float64); w != 1024 {
+		t.Errorf("expected width=1024, got %v", w)
+	}
+}
+
+func TestWindowEventWithAction(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"T","width":800,"height":600}
+{"type":"on","surfaceId":"main","id":"close-1","event":"window.beforeClose","handler":{"action":{"event":{"name":"closeRequested"}}}}`)
+
+	sess.EventManager().Fire("window.beforeClose", "main", `{}`)
+
+	// Verify subscription was registered (action handler fires through session)
+	em := sess.EventManager()
+	em.mu.Lock()
+	_, exists := em.subs["close-1"]
+	em.mu.Unlock()
+	if !exists {
+		t.Fatal("expected close-1 subscription to exist")
+	}
+}
+
+func TestSystemEventFires(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"T","width":800,"height":600}
+{"type":"on","surfaceId":"main","id":"appearance-1","event":"system.appearance","handler":{"dataPath":"/system/appearance"}}`)
+
+	sess.EventManager().Fire("system.appearance", "main", `{"appearance":"dark"}`)
+
+	sess.mu.Lock()
+	surf := sess.surfaces["main"]
+	sess.mu.Unlock()
+
+	val, found := surf.dm.Get("/system/appearance")
+	if !found {
+		t.Fatal("expected /system/appearance to be set after appearance event")
+	}
+	m, ok := val.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map, got %T", val)
+	}
+	if app, _ := m["appearance"].(string); app != "dark" {
+		t.Errorf("expected appearance=dark, got %v", app)
+	}
+}
+
+func TestSystemClipboardEvent(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"T","width":800,"height":600}
+{"type":"on","surfaceId":"main","id":"clip-1","event":"system.clipboard.changed","handler":{"dataPath":"/clipboard/changed","dataValue":true}}`)
+
+	sess.EventManager().Fire("system.clipboard.changed", "main", `{}`)
+
+	sess.mu.Lock()
+	surf := sess.surfaces["main"]
+	sess.mu.Unlock()
+
+	val, found := surf.dm.Get("/clipboard/changed")
+	if !found {
+		t.Fatal("expected /clipboard/changed to be set")
+	}
+	if val != true {
+		t.Fatalf("expected /clipboard/changed=true, got %v", val)
+	}
+}
+
+func TestFSWatchSubscription(t *testing.T) {
+	dir := t.TempDir()
+
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"T","width":800,"height":600}`)
+
+	sess.EventManager().Subscribe(protocol.OnMessage{
+		Type:      protocol.MsgOn,
+		SurfaceID: "main",
+		ID:        "fs-1",
+		Event:     "system.fs.watch",
+		Config:    map[string]interface{}{"paths": []interface{}{dir}},
+		Handler:   protocol.EventAction{DataPath: "/fs/event"},
+	})
+
+	// Write a file to trigger the watcher
+	if err := os.WriteFile(dir+"/test.txt", []byte("hello"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	// Wait for event to propagate
+	time.Sleep(200 * time.Millisecond)
+
+	sess.mu.Lock()
+	surf := sess.surfaces["main"]
+	sess.mu.Unlock()
+
+	val, found := surf.dm.Get("/fs/event")
+	if !found {
+		t.Fatal("expected /fs/event to be set after file creation")
+	}
+	m, ok := val.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map, got %T", val)
+	}
+	if _, ok := m["path"]; !ok {
+		t.Error("expected 'path' key in fs event data")
+	}
+
+	sess.EventManager().Unsubscribe("fs-1")
+}
+
+func TestMultipleWindowEventSubscribers(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"main","title":"T","width":800,"height":600}
+{"type":"on","surfaceId":"main","id":"r1","event":"window.resize","handler":{"dataPath":"/r1"}}
+{"type":"on","surfaceId":"main","id":"r2","event":"window.resize","handler":{"dataPath":"/r2"}}`)
+
+	sess.EventManager().Fire("window.resize", "main", `{"width":500,"height":400}`)
+
+	sess.mu.Lock()
+	surf := sess.surfaces["main"]
+	sess.mu.Unlock()
+
+	if _, found := surf.dm.Get("/r1"); !found {
+		t.Error("expected /r1 to be set")
+	}
+	if _, found := surf.dm.Get("/r2"); !found {
+		t.Error("expected /r2 to be set")
 	}
 }
