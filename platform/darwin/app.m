@@ -208,6 +208,7 @@ void* JVCreateWindow(const char* title, int width, int height, const char* surfa
     }
     [window center];
     [window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
 
     // Apply background color if specified
     NSString *bgStr = [NSString stringWithUTF8String:backgroundColor];
