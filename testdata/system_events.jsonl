@@ -5,10 +5,15 @@
 {"type":"on","surfaceId":"main","id":"power-wake","event":"system.power.wake","handler":{"dataPath":"/system/power","dataValue":"awake"}}
 {"type":"on","surfaceId":"main","id":"display","event":"system.display.changed","handler":{"dataPath":"/system/display"}}
 {"type":"on","surfaceId":"main","id":"locale","event":"system.locale.changed","handler":{"dataPath":"/system/locale"}}
+{"type":"on","surfaceId":"main","id":"network","event":"system.network.reachability","handler":{"dataPath":"/system/network"}}
+{"type":"on","surfaceId":"main","id":"accessibility","event":"system.accessibility","handler":{"dataPath":"/system/accessibility"}}
+{"type":"on","surfaceId":"main","id":"thermal","event":"system.thermal","handler":{"dataPath":"/system/thermal"}}
 {"type":"component","surfaceId":"main","componentId":"root","type":"Column","props":{"padding":20,"spacing":12}}
 {"type":"component","surfaceId":"main","componentId":"title","type":"Text","props":{"content":"System Events","style":"title","parentId":"root"}}
 {"type":"component","surfaceId":"main","componentId":"appearance-label","type":"Text","props":{"content":{"$expr":"'Appearance: ' + str(get('/system/appearance/appearance', 'unknown'))"},"parentId":"root"}}
 {"type":"component","surfaceId":"main","componentId":"power-label","type":"Text","props":{"content":{"$expr":"'Power: ' + str(get('/system/power', 'awake'))"},"parentId":"root"}}
 {"type":"component","surfaceId":"main","componentId":"display-label","type":"Text","props":{"content":{"$expr":"'Screens: ' + str(get('/system/display/screenCount', '?'))"},"parentId":"root"}}
 {"type":"component","surfaceId":"main","componentId":"locale-label","type":"Text","props":{"content":{"$expr":"'Locale: ' + str(get('/system/locale/locale', 'unknown'))"},"parentId":"root"}}
+{"type":"component","surfaceId":"main","componentId":"network-label","type":"Text","props":{"content":{"$expr":"'Network: ' + str(get('/system/network/status', 'unknown'))"},"parentId":"root"}}
+{"type":"component","surfaceId":"main","componentId":"thermal-label","type":"Text","props":{"content":{"$expr":"'Thermal: ' + str(get('/system/thermal/state', 'nominal'))"},"parentId":"root"}}
 {"type":"component","surfaceId":"main","componentId":"info","type":"Text","props":{"content":"Change system dark mode, copy something, or sleep/wake to see events.","style":"footnote","color":"#888888","parentId":"root"}}
