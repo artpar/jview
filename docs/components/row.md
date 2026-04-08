@@ -25,12 +25,46 @@ Arranges child components side by side from left to right. Use Row for toolbars,
 Two buttons side by side with spacing:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Row Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Row","props":{"gap":12,"align":"center"},"children":["cancel","save"]},
-  {"componentId":"cancel","type":"Button","props":{"label":"Cancel","style":"secondary"}},
-  {"componentId":"save","type":"Button","props":{"label":"Save","style":"primary"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Row Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Row",
+      "props": {
+        "gap": 12,
+        "align": "center"
+      },
+      "children": [
+        "cancel",
+        "save"
+      ]
+    },
+    {
+      "componentId": "cancel",
+      "type": "Button",
+      "props": {
+        "label": "Cancel",
+        "style": "secondary"
+      }
+    },
+    {
+      "componentId": "save",
+      "type": "Button",
+      "props": {
+        "label": "Save",
+        "style": "primary"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

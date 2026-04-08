@@ -26,16 +26,76 @@ Displays a horizontal bar showing progress toward completion. Supports both dete
 File upload progress:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"ProgressBar Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/progress","value":35}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":8},"children":["label","bar","status"]},
-  {"componentId":"label","type":"Text","props":{"content":"Uploading...","variant":"h3"}},
-  {"componentId":"bar","type":"ProgressBar","props":{"value":{"$ref":"/progress"},"maxValue":100}},
-  {"componentId":"status","type":"Text","props":{"content":{"$concat":[{"$ref":"/progress"},"% complete"]},"variant":"caption"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "ProgressBar Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/progress",
+      "value": 35
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 8
+      },
+      "children": [
+        "label",
+        "bar",
+        "status"
+      ]
+    },
+    {
+      "componentId": "label",
+      "type": "Text",
+      "props": {
+        "content": "Uploading...",
+        "variant": "h3"
+      }
+    },
+    {
+      "componentId": "bar",
+      "type": "ProgressBar",
+      "props": {
+        "value": {
+          "$ref": "/progress"
+        },
+        "maxValue": 100
+      }
+    },
+    {
+      "componentId": "status",
+      "type": "Text",
+      "props": {
+        "content": {
+          "$concat": [
+            {
+              "$ref": "/progress"
+            },
+            "% complete"
+          ]
+        },
+        "variant": "caption"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

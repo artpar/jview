@@ -14,9 +14,24 @@ Any component prop that accepts a dynamic value can use three kinds of expressio
 Plain strings, numbers, and booleans pass through unchanged:
 
 ```json
-{"props": {"content": "Hello"}}
-{"props": {"min": 0, "max": 100}}
-{"props": {"checked": true}}
+{
+  "props": {
+    "content": "Hello"
+  }
+}
+
+{
+  "props": {
+    "min": 0,
+    "max": 100
+  }
+}
+
+{
+  "props": {
+    "checked": true
+  }
+}
 ```
 
 ## Path References
@@ -24,7 +39,13 @@ Plain strings, numbers, and booleans pass through unchanged:
 Read a value from the data model:
 
 ```json
-{"props": {"content": {"path": "/user/name"}}}
+{
+  "props": {
+    "content": {
+      "path": "/user/name"
+    }
+  }
+}
 ```
 
 If the path doesn't exist, the value resolves to an empty string.
@@ -34,7 +55,21 @@ If the path doesn't exist, the value resolves to an empty string.
 Compute a value using built-in or user-defined functions:
 
 ```json
-{"props": {"content": {"functionCall": {"name": "concat", "args": ["Count: ", {"path": "/count"}]}}}}
+{
+  "props": {
+    "content": {
+      "functionCall": {
+        "name": "concat",
+        "args": [
+          "Count: ",
+          {
+            "path": "/count"
+          }
+        ]
+      }
+    }
+  }
+}
 ```
 
 A function call has two fields:
@@ -46,16 +81,27 @@ A function call has two fields:
 Arguments can themselves be function calls, allowing arbitrary computation:
 
 ```json
-{"functionCall": {
-  "name": "concat",
-  "args": [
-    "Total: $",
-    {"functionCall": {
-      "name": "multiply",
-      "args": [{"path": "/quantity"}, {"path": "/price"}]
-    }}
-  ]
-}}
+{
+  "functionCall": {
+    "name": "concat",
+    "args": [
+      "Total: $",
+      {
+        "functionCall": {
+          "name": "multiply",
+          "args": [
+            {
+              "path": "/quantity"
+            },
+            {
+              "path": "/price"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
 ```
 
 ## Conditional Values
@@ -63,14 +109,36 @@ Arguments can themselves be function calls, allowing arbitrary computation:
 Use the `if` function to choose between values:
 
 ```json
-{"functionCall": {
-  "name": "if",
-  "args": [
-    {"functionCall": {"name": "greaterThan", "args": [{"path": "/count"}, 0]}},
-    {"functionCall": {"name": "concat", "args": [{"path": "/count"}, " items"]}},
-    "No items"
-  ]
-}}
+{
+  "functionCall": {
+    "name": "if",
+    "args": [
+      {
+        "functionCall": {
+          "name": "greaterThan",
+          "args": [
+            {
+              "path": "/count"
+            },
+            0
+          ]
+        }
+      },
+      {
+        "functionCall": {
+          "name": "concat",
+          "args": [
+            {
+              "path": "/count"
+            },
+            " items"
+          ]
+        }
+      },
+      "No items"
+    ]
+  }
+}
 ```
 
 The `if` function is lazy -- it only evaluates the branch that matches the condition.

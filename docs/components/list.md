@@ -27,16 +27,82 @@ Use List when you have many items that may exceed the visible area. List provide
 A scrollable list of cards:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"List Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"List","props":{"gap":8,"padding":12},"children":["item1","item2","item3"]},
-  {"componentId":"item1","type":"Card","props":{"title":"Item 1"},"children":["t1"]},
-  {"componentId":"t1","type":"Text","props":{"content":"First item content"}},
-  {"componentId":"item2","type":"Card","props":{"title":"Item 2"},"children":["t2"]},
-  {"componentId":"t2","type":"Text","props":{"content":"Second item content"}},
-  {"componentId":"item3","type":"Card","props":{"title":"Item 3"},"children":["t3"]},
-  {"componentId":"t3","type":"Text","props":{"content":"Third item content"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "List Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "List",
+      "props": {
+        "gap": 8,
+        "padding": 12
+      },
+      "children": [
+        "item1",
+        "item2",
+        "item3"
+      ]
+    },
+    {
+      "componentId": "item1",
+      "type": "Card",
+      "props": {
+        "title": "Item 1"
+      },
+      "children": [
+        "t1"
+      ]
+    },
+    {
+      "componentId": "t1",
+      "type": "Text",
+      "props": {
+        "content": "First item content"
+      }
+    },
+    {
+      "componentId": "item2",
+      "type": "Card",
+      "props": {
+        "title": "Item 2"
+      },
+      "children": [
+        "t2"
+      ]
+    },
+    {
+      "componentId": "t2",
+      "type": "Text",
+      "props": {
+        "content": "Second item content"
+      }
+    },
+    {
+      "componentId": "item3",
+      "type": "Card",
+      "props": {
+        "title": "Item 3"
+      },
+      "children": [
+        "t3"
+      ]
+    },
+    {
+      "componentId": "t3",
+      "type": "Text",
+      "props": {
+        "content": "Third item content"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

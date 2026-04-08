@@ -27,17 +27,75 @@ A text field styled for search with a magnifying glass icon and a clear button. 
 Search field that filters a list:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"SearchField Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/query","value":""}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":8},"children":["search","results"]},
-  {"componentId":"search","type":"SearchField","props":{"placeholder":"Search items...","dataBinding":"/query"}},
-  {"componentId":"results","type":"List","props":{"gap":4},"children":["r1","r2"]},
-  {"componentId":"r1","type":"Text","props":{"content":"Result 1"}},
-  {"componentId":"r2","type":"Text","props":{"content":"Result 2"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "SearchField Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/query",
+      "value": ""
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 8
+      },
+      "children": [
+        "search",
+        "results"
+      ]
+    },
+    {
+      "componentId": "search",
+      "type": "SearchField",
+      "props": {
+        "placeholder": "Search items...",
+        "dataBinding": "/query"
+      }
+    },
+    {
+      "componentId": "results",
+      "type": "List",
+      "props": {
+        "gap": 4
+      },
+      "children": [
+        "r1",
+        "r2"
+      ]
+    },
+    {
+      "componentId": "r1",
+      "type": "Text",
+      "props": {
+        "content": "Result 1"
+      }
+    },
+    {
+      "componentId": "r2",
+      "type": "Text",
+      "props": {
+        "content": "Result 2"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

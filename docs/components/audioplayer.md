@@ -27,15 +27,46 @@ Plays audio from a URL or local file. Renders as a compact 40-point bar with pla
 Podcast player:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"AudioPlayer Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":8},"children":["title","player"]},
-  {"componentId":"title","type":"Text","props":{"content":"Episode 42: Native macOS Apps","variant":"h3"}},
-  {"componentId":"player","type":"AudioPlayer","props":{
-    "src":"https://example.com/podcast-ep42.mp3",
-    "autoplay":false
-  }}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "AudioPlayer Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 8
+      },
+      "children": [
+        "title",
+        "player"
+      ]
+    },
+    {
+      "componentId": "title",
+      "type": "Text",
+      "props": {
+        "content": "Episode 42: Native macOS Apps",
+        "variant": "h3"
+      }
+    },
+    {
+      "componentId": "player",
+      "type": "AudioPlayer",
+      "props": {
+        "src": "https://example.com/podcast-ep42.mp3",
+        "autoplay": false
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

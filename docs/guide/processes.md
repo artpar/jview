@@ -12,13 +12,35 @@ A process is a named background worker with its own message transport. Processes
 ## Creating a Process
 
 ```json
-{"type":"createProcess","processId":"timer","transport":{
-  "type": "interval",
-  "interval": 1000,
-  "message": {"type":"updateDataModel","surfaceId":"main","ops":[
-    {"op":"replace","path":"/tick","value":{"functionCall":{"name":"add","args":[{"path":"/tick"},1]}}}
-  ]}
-}}
+{
+  "type": "createProcess",
+  "processId": "timer",
+  "transport": {
+    "type": "interval",
+    "interval": 1000,
+    "message": {
+      "type": "updateDataModel",
+      "surfaceId": "main",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/tick",
+          "value": {
+            "functionCall": {
+              "name": "add",
+              "args": [
+                {
+                  "path": "/tick"
+                },
+                1
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
 ```
 
 The `transport` object configures how the process receives messages:
@@ -36,10 +58,14 @@ The `transport` object configures how the process receives messages:
 Loads and processes a JSONL file:
 
 ```json
-{"type":"createProcess","processId":"loader","transport":{
-  "type": "file",
-  "path": "components/sidebar.jsonl"
-}}
+{
+  "type": "createProcess",
+  "processId": "loader",
+  "transport": {
+    "type": "file",
+    "path": "components/sidebar.jsonl"
+  }
+}
 ```
 
 ### Interval Transport
@@ -47,13 +73,30 @@ Loads and processes a JSONL file:
 Sends the same message on a timer:
 
 ```json
-{"type":"createProcess","processId":"clock","transport":{
-  "type": "interval",
-  "interval": 1000,
-  "message": {"type":"updateDataModel","surfaceId":"main","ops":[
-    {"op":"replace","path":"/time","value":{"functionCall":{"name":"now","args":[]}}}
-  ]}
-}}
+{
+  "type": "createProcess",
+  "processId": "clock",
+  "transport": {
+    "type": "interval",
+    "interval": 1000,
+    "message": {
+      "type": "updateDataModel",
+      "surfaceId": "main",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/time",
+          "value": {
+            "functionCall": {
+              "name": "now",
+              "args": []
+            }
+          }
+        }
+      ]
+    }
+  }
+}
 ```
 
 ### LLM Transport
@@ -61,12 +104,16 @@ Sends the same message on a timer:
 Connects to an LLM that sends A2UI messages:
 
 ```json
-{"type":"createProcess","processId":"agent","transport":{
-  "type": "llm",
-  "provider": "anthropic",
-  "model": "claude-sonnet-4-20250514",
-  "prompt": "Build a todo list app"
-}}
+{
+  "type": "createProcess",
+  "processId": "agent",
+  "transport": {
+    "type": "llm",
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "prompt": "Build a todo list app"
+  }
+}
 ```
 
 ## Process Status
@@ -82,15 +129,32 @@ Each process publishes its status to the data model at `/processes/{processId}/s
 Display it in your UI:
 
 ```json
-{"componentId":"status","type":"Text","props":{
-  "content": {"functionCall":{"name":"concat","args":["Timer: ",{"path":"/processes/timer/status"}]}}
-}}
+{
+  "componentId": "status",
+  "type": "Text",
+  "props": {
+    "content": {
+      "functionCall": {
+        "name": "concat",
+        "args": [
+          "Timer: ",
+          {
+            "path": "/processes/timer/status"
+          }
+        ]
+      }
+    }
+  }
+}
 ```
 
 ## Stopping a Process
 
 ```json
-{"type":"stopProcess","processId":"timer"}
+{
+  "type": "stopProcess",
+  "processId": "timer"
+}
 ```
 
 ## Sending Messages to a Process
@@ -98,29 +162,127 @@ Display it in your UI:
 Route a message to a running process:
 
 ```json
-{"type":"sendToProcess","processId":"agent","message":{
-  "type":"updateDataModel","surfaceId":"main","ops":[
-    {"op":"replace","path":"/prompt","value":"Add a delete button"}
-  ]
-}}
+{
+  "type": "sendToProcess",
+  "processId": "agent",
+  "message": {
+    "type": "updateDataModel",
+    "surfaceId": "main",
+    "ops": [
+      {
+        "op": "replace",
+        "path": "/prompt",
+        "value": "Add a delete button"
+      }
+    ]
+  }
+}
 ```
 
 ## Example: Auto-Incrementing Counter
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Counter","width":300,"height":200}
-{"type":"updateDataModel","surfaceId":"main","ops":[{"op":"add","path":"/tick","value":0}]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"gap":12,"align":"center"},"children":["count","controls"]},
-  {"componentId":"count","type":"Text","props":{"content":{"path":"/tick"},"variant":"h1"}},
-  {"componentId":"controls","type":"Row","props":{"gap":8},"children":["startBtn","stopBtn"]},
-  {"componentId":"startBtn","type":"Button","props":{"label":"Start"}},
-  {"componentId":"stopBtn","type":"Button","props":{"label":"Stop"}}
-]}
-{"type":"createProcess","processId":"counter","transport":{
-  "type":"interval","interval":1000,
-  "message":{"type":"updateDataModel","surfaceId":"main","ops":[
-    {"op":"replace","path":"/tick","value":{"functionCall":{"name":"add","args":[{"path":"/tick"},1]}}}
-  ]}
-}}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Counter",
+  "width": 300,
+  "height": 200
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "ops": [
+    {
+      "op": "add",
+      "path": "/tick",
+      "value": 0
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "gap": 12,
+        "align": "center"
+      },
+      "children": [
+        "count",
+        "controls"
+      ]
+    },
+    {
+      "componentId": "count",
+      "type": "Text",
+      "props": {
+        "content": {
+          "path": "/tick"
+        },
+        "variant": "h1"
+      }
+    },
+    {
+      "componentId": "controls",
+      "type": "Row",
+      "props": {
+        "gap": 8
+      },
+      "children": [
+        "startBtn",
+        "stopBtn"
+      ]
+    },
+    {
+      "componentId": "startBtn",
+      "type": "Button",
+      "props": {
+        "label": "Start"
+      }
+    },
+    {
+      "componentId": "stopBtn",
+      "type": "Button",
+      "props": {
+        "label": "Stop"
+      }
+    }
+  ]
+}
+
+{
+  "type": "createProcess",
+  "processId": "counter",
+  "transport": {
+    "type": "interval",
+    "interval": 1000,
+    "message": {
+      "type": "updateDataModel",
+      "surfaceId": "main",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/tick",
+          "value": {
+            "functionCall": {
+              "name": "add",
+              "args": [
+                {
+                  "path": "/tick"
+                },
+                1
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
 ```

@@ -28,13 +28,55 @@ Wraps child components in a bordered box with a title bar. Cards visually group 
 A card containing user profile info:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Card Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16},"children":["profile"]},
-  {"componentId":"profile","type":"Card","props":{"title":"User Profile","padding":12},"children":["name","email"]},
-  {"componentId":"name","type":"Text","props":{"content":"Jane Smith","variant":"h3"}},
-  {"componentId":"email","type":"Text","props":{"content":"jane@example.com"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Card Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16
+      },
+      "children": [
+        "profile"
+      ]
+    },
+    {
+      "componentId": "profile",
+      "type": "Card",
+      "props": {
+        "title": "User Profile",
+        "padding": 12
+      },
+      "children": [
+        "name",
+        "email"
+      ]
+    },
+    {
+      "componentId": "name",
+      "type": "Text",
+      "props": {
+        "content": "Jane Smith",
+        "variant": "h3"
+      }
+    },
+    {
+      "componentId": "email",
+      "type": "Text",
+      "props": {
+        "content": "jane@example.com"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

@@ -29,20 +29,132 @@ Displays a floating panel above the main window. Use Modal for confirmations, fo
 A confirmation dialog controlled by data binding:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Modal Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/showConfirm","value":false}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":12},"children":["openBtn","dialog"]},
-  {"componentId":"openBtn","type":"Button","props":{"label":"Delete Item","style":"destructive","onClick":{"action":{"setValues":[{"path":"/showConfirm","value":true}]}}}},
-  {"componentId":"dialog","type":"Modal","props":{"title":"Confirm Delete","visible":{"$ref":"/showConfirm"},"dataBinding":"/showConfirm","width":400,"height":200},"children":["dialogContent"]},
-  {"componentId":"dialogContent","type":"Column","props":{"padding":16,"gap":12},"children":["msg","actions"]},
-  {"componentId":"msg","type":"Text","props":{"content":"Are you sure you want to delete this item?"}},
-  {"componentId":"actions","type":"Row","props":{"gap":8,"justify":"end"},"children":["cancelBtn","confirmBtn"]},
-  {"componentId":"cancelBtn","type":"Button","props":{"label":"Cancel","onClick":{"action":{"setValues":[{"path":"/showConfirm","value":false}]}}}},
-  {"componentId":"confirmBtn","type":"Button","props":{"label":"Delete","style":"destructive"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Modal Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/showConfirm",
+      "value": false
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 12
+      },
+      "children": [
+        "openBtn",
+        "dialog"
+      ]
+    },
+    {
+      "componentId": "openBtn",
+      "type": "Button",
+      "props": {
+        "label": "Delete Item",
+        "style": "destructive",
+        "onClick": {
+          "action": {
+            "setValues": [
+              {
+                "path": "/showConfirm",
+                "value": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "componentId": "dialog",
+      "type": "Modal",
+      "props": {
+        "title": "Confirm Delete",
+        "visible": {
+          "$ref": "/showConfirm"
+        },
+        "dataBinding": "/showConfirm",
+        "width": 400,
+        "height": 200
+      },
+      "children": [
+        "dialogContent"
+      ]
+    },
+    {
+      "componentId": "dialogContent",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 12
+      },
+      "children": [
+        "msg",
+        "actions"
+      ]
+    },
+    {
+      "componentId": "msg",
+      "type": "Text",
+      "props": {
+        "content": "Are you sure you want to delete this item?"
+      }
+    },
+    {
+      "componentId": "actions",
+      "type": "Row",
+      "props": {
+        "gap": 8,
+        "justify": "end"
+      },
+      "children": [
+        "cancelBtn",
+        "confirmBtn"
+      ]
+    },
+    {
+      "componentId": "cancelBtn",
+      "type": "Button",
+      "props": {
+        "label": "Cancel",
+        "onClick": {
+          "action": {
+            "setValues": [
+              {
+                "path": "/showConfirm",
+                "value": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "componentId": "confirmBtn",
+      "type": "Button",
+      "props": {
+        "label": "Delete",
+        "style": "destructive"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

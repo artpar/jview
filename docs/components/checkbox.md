@@ -25,15 +25,63 @@ A labeled checkbox that toggles between checked and unchecked states. Supports t
 Terms agreement checkbox:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"CheckBox Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/agreed","value":false}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":12},"children":["terms","submit"]},
-  {"componentId":"terms","type":"CheckBox","props":{"label":"I agree to the terms and conditions","dataBinding":"/agreed"}},
-  {"componentId":"submit","type":"Button","props":{"label":"Continue","style":"primary","disabled":{"$not":{"$ref":"/agreed"}}}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "CheckBox Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/agreed",
+      "value": false
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 12
+      },
+      "children": [
+        "terms",
+        "submit"
+      ]
+    },
+    {
+      "componentId": "terms",
+      "type": "CheckBox",
+      "props": {
+        "label": "I agree to the terms and conditions",
+        "dataBinding": "/agreed"
+      }
+    },
+    {
+      "componentId": "submit",
+      "type": "Button",
+      "props": {
+        "label": "Continue",
+        "style": "primary",
+        "disabled": {
+          "$not": {
+            "$ref": "/agreed"
+          }
+        }
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

@@ -25,12 +25,45 @@ Arranges child components top to bottom. Column is the most common root containe
 A heading followed by body text:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Column Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"gap":8,"padding":16},"children":["heading","body"]},
-  {"componentId":"heading","type":"Text","props":{"content":"Welcome","variant":"h1"}},
-  {"componentId":"body","type":"Text","props":{"content":"This is a vertical layout with a heading and paragraph."}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Column Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "gap": 8,
+        "padding": 16
+      },
+      "children": [
+        "heading",
+        "body"
+      ]
+    },
+    {
+      "componentId": "heading",
+      "type": "Text",
+      "props": {
+        "content": "Welcome",
+        "variant": "h1"
+      }
+    },
+    {
+      "componentId": "body",
+      "type": "Text",
+      "props": {
+        "content": "This is a vertical layout with a heading and paragraph."
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

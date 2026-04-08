@@ -27,19 +27,73 @@ Size is controlled via `style.width` and `style.height` on the component.
 Photo capture view:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"CameraView Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/photoPath","value":""}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":12,"align":"center"},"children":["camera","captureBtn"]},
-  {"componentId":"camera","type":"CameraView","props":{
-    "devicePosition":"front",
-    "mirrored":true,
-    "onCapture":{"action":{"setValues":[{"path":"/photoPath","value":"$event.path"}]}}
-  },"style":{"width":320,"height":240}},
-  {"componentId":"captureBtn","type":"Button","props":{"label":"Take Photo","style":"primary"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "CameraView Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/photoPath",
+      "value": ""
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 12,
+        "align": "center"
+      },
+      "children": [
+        "camera",
+        "captureBtn"
+      ]
+    },
+    {
+      "componentId": "camera",
+      "type": "CameraView",
+      "props": {
+        "devicePosition": "front",
+        "mirrored": true,
+        "onCapture": {
+          "action": {
+            "setValues": [
+              {
+                "path": "/photoPath",
+                "value": "$event.path"
+              }
+            ]
+          }
+        }
+      },
+      "style": {
+        "width": 320,
+        "height": 240
+      }
+    },
+    {
+      "componentId": "captureBtn",
+      "type": "Button",
+      "props": {
+        "label": "Take Photo",
+        "style": "primary"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

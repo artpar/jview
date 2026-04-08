@@ -26,15 +26,59 @@ A native macOS date picker that can show date, time, or both. Uses the system lo
 Event date picker:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"DateTimeInput Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/eventDate","value":""}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":8},"children":["label","picker"]},
-  {"componentId":"label","type":"Text","props":{"content":"Event Date","variant":"h3"}},
-  {"componentId":"picker","type":"DateTimeInput","props":{"enableDate":true,"enableTime":true,"dataBinding":"/eventDate"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "DateTimeInput Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/eventDate",
+      "value": ""
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 8
+      },
+      "children": [
+        "label",
+        "picker"
+      ]
+    },
+    {
+      "componentId": "label",
+      "type": "Text",
+      "props": {
+        "content": "Event Date",
+        "variant": "h3"
+      }
+    },
+    {
+      "componentId": "picker",
+      "type": "DateTimeInput",
+      "props": {
+        "enableDate": true,
+        "enableTime": true,
+        "dataBinding": "/eventDate"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

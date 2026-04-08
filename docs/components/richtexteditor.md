@@ -42,14 +42,48 @@ A full-featured text editor that renders markdown formatting in real time. Suppo
 Note editor:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"RichTextEditor Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/noteContent","value":"# My Note\n\nThis is **bold** and *italic* text.\n\n- [ ] First task\n- [x] Completed task"}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16},"children":["editor"]},
-  {"componentId":"editor","type":"RichTextEditor","props":{"dataBinding":"/noteContent","editable":true}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "RichTextEditor Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/noteContent",
+      "value": "# My Note\n\nThis is **bold** and *italic* text.\n\n- [ ] First task\n- [x] Completed task"
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16
+      },
+      "children": [
+        "editor"
+      ]
+    },
+    {
+      "componentId": "editor",
+      "type": "RichTextEditor",
+      "props": {
+        "dataBinding": "/noteContent",
+        "editable": true
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

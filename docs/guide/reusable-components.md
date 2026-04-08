@@ -14,17 +14,55 @@ Use `defineComponent` to create a reusable component template, then instantiate 
 A `defineComponent` message registers a template with a name, parameters, and a component tree:
 
 ```json
-{"type":"defineComponent","name":"DigitButton","params":["digit"],
-  "components":[
-    {"componentId":"_root","type":"Button","props":{
-      "label":{"param":"digit"},
-      "onClick":{"action":{"functionCall":{
-        "call":"updateDataModel",
-        "args":{"ops":[
-          {"op":"replace","path":"/display","value":{"functionCall":{"name":"concat","args":[{"path":"/display"},{"param":"digit"}]}}}
-        ]}
-      }}}
-    },"style":{"width":60,"height":60,"fontSize":24}}
+{
+  "type": "defineComponent",
+  "name": "DigitButton",
+  "params": [
+    "digit"
+  ],
+  "components": [
+    {
+      "componentId": "_root",
+      "type": "Button",
+      "props": {
+        "label": {
+          "param": "digit"
+        },
+        "onClick": {
+          "action": {
+            "functionCall": {
+              "call": "updateDataModel",
+              "args": {
+                "ops": [
+                  {
+                    "op": "replace",
+                    "path": "/display",
+                    "value": {
+                      "functionCall": {
+                        "name": "concat",
+                        "args": [
+                          {
+                            "path": "/display"
+                          },
+                          {
+                            "param": "digit"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "style": {
+        "width": 60,
+        "height": 60,
+        "fontSize": 24
+      }
+    }
   ]
 }
 ```
@@ -40,7 +78,13 @@ Key rules:
 Reference the template with `useComponent` and pass arguments:
 
 ```json
-{"componentId":"btn7","useComponent":"DigitButton","args":{"digit":"7"}}
+{
+  "componentId": "btn7",
+  "useComponent": "DigitButton",
+  "args": {
+    "digit": "7"
+  }
+}
 ```
 
 This creates a Button instance with:
@@ -69,18 +113,81 @@ For example, with a template containing `_root`, `_label`, and `_icon`, and an i
 Parameters prefixed with `$` create scoped data model paths for each instance. This lets multiple instances of the same template have independent state:
 
 ```json
-{"type":"defineComponent","name":"Counter","params":["$count","label"],
-  "components":[
-    {"componentId":"_root","type":"Column","children":["_text","_btn"]},
-    {"componentId":"_text","type":"Text","props":{
-      "content":{"functionCall":{"name":"concat","args":[{"param":"label"},": ",{"path":{"param":"$count"}}]}}
-    }},
-    {"componentId":"_btn","type":"Button","props":{
-      "label":"+1",
-      "onClick":{"action":{"functionCall":{"call":"updateDataModel","args":{"ops":[
-        {"op":"replace","path":{"param":"$count"},"value":{"functionCall":{"name":"add","args":[{"path":{"param":"$count"}},1]}}}
-      ]}}}}
-    }}
+{
+  "type": "defineComponent",
+  "name": "Counter",
+  "params": [
+    "$count",
+    "label"
+  ],
+  "components": [
+    {
+      "componentId": "_root",
+      "type": "Column",
+      "children": [
+        "_text",
+        "_btn"
+      ]
+    },
+    {
+      "componentId": "_text",
+      "type": "Text",
+      "props": {
+        "content": {
+          "functionCall": {
+            "name": "concat",
+            "args": [
+              {
+                "param": "label"
+              },
+              ": ",
+              {
+                "path": {
+                  "param": "$count"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "componentId": "_btn",
+      "type": "Button",
+      "props": {
+        "label": "+1",
+        "onClick": {
+          "action": {
+            "functionCall": {
+              "call": "updateDataModel",
+              "args": {
+                "ops": [
+                  {
+                    "op": "replace",
+                    "path": {
+                      "param": "$count"
+                    },
+                    "value": {
+                      "functionCall": {
+                        "name": "add",
+                        "args": [
+                          {
+                            "path": {
+                              "param": "$count"
+                            }
+                          },
+                          1
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
   ]
 }
 ```
@@ -88,28 +195,117 @@ Parameters prefixed with `$` create scoped data model paths for each instance. T
 Each instance passes its own data model path:
 
 ```json
-{"componentId":"counterA","useComponent":"Counter","args":{"$count":"/counters/a","label":"Counter A"}}
-{"componentId":"counterB","useComponent":"Counter","args":{"$count":"/counters/b","label":"Counter B"}}
+{
+  "componentId": "counterA",
+  "useComponent": "Counter",
+  "args": {
+    "$count": "/counters/a",
+    "label": "Counter A"
+  }
+}
+
+{
+  "componentId": "counterB",
+  "useComponent": "Counter",
+  "args": {
+    "$count": "/counters/b",
+    "label": "Counter B"
+  }
+}
 ```
 
 ## Full Example: Calculator Digit Buttons
 
 ```json
-{"type":"defineComponent","name":"DigitButton","params":["digit"],
-  "components":[
-    {"componentId":"_root","type":"Button","props":{
-      "label":{"param":"digit"},
-      "onClick":{"action":{"functionCall":{"call":"updateDataModel","args":{"ops":[
-        {"op":"replace","path":"/display","value":{"functionCall":{"name":"concat","args":[{"path":"/display"},{"param":"digit"}]}}}
-      ]}}}}
-    },"style":{"width":60,"height":60,"fontSize":24}}
+{
+  "type": "defineComponent",
+  "name": "DigitButton",
+  "params": [
+    "digit"
+  ],
+  "components": [
+    {
+      "componentId": "_root",
+      "type": "Button",
+      "props": {
+        "label": {
+          "param": "digit"
+        },
+        "onClick": {
+          "action": {
+            "functionCall": {
+              "call": "updateDataModel",
+              "args": {
+                "ops": [
+                  {
+                    "op": "replace",
+                    "path": "/display",
+                    "value": {
+                      "functionCall": {
+                        "name": "concat",
+                        "args": [
+                          {
+                            "path": "/display"
+                          },
+                          {
+                            "param": "digit"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "style": {
+        "width": 60,
+        "height": 60,
+        "fontSize": 24
+      }
+    }
   ]
 }
 
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"row1","type":"Row","props":{"gap":4},"children":["btn7","btn8","btn9"]},
-  {"componentId":"btn7","useComponent":"DigitButton","args":{"digit":"7"}},
-  {"componentId":"btn8","useComponent":"DigitButton","args":{"digit":"8"}},
-  {"componentId":"btn9","useComponent":"DigitButton","args":{"digit":"9"}}
-]}
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "row1",
+      "type": "Row",
+      "props": {
+        "gap": 4
+      },
+      "children": [
+        "btn7",
+        "btn8",
+        "btn9"
+      ]
+    },
+    {
+      "componentId": "btn7",
+      "useComponent": "DigitButton",
+      "args": {
+        "digit": "7"
+      }
+    },
+    {
+      "componentId": "btn8",
+      "useComponent": "DigitButton",
+      "args": {
+        "digit": "8"
+      }
+    },
+    {
+      "componentId": "btn9",
+      "useComponent": "DigitButton",
+      "args": {
+        "digit": "9"
+      }
+    }
+  ]
+}
 ```

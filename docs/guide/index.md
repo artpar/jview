@@ -12,10 +12,28 @@ Canopy apps are JSONL files -- one JSON message per line. Each message creates a
 A minimal app needs two messages:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"My App","width":400,"height":300}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"hello","type":"Text","props":{"content":"Hello, world!","variant":"h1"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "My App",
+  "width": 400,
+  "height": 300
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "hello",
+      "type": "Text",
+      "props": {
+        "content": "Hello, world!",
+        "variant": "h1"
+      }
+    }
+  ]
+}
 ```
 
 The first line opens a window. The second line puts a heading in it.

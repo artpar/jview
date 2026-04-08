@@ -26,22 +26,71 @@ Presents a list of options for the user to choose from. Renders as a native macO
 Theme selector:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"ChoicePicker Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/theme","value":"system"}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":8},"children":["label","picker"]},
-  {"componentId":"label","type":"Text","props":{"content":"Theme","variant":"h3"}},
-  {"componentId":"picker","type":"ChoicePicker","props":{
-    "options":[
-      {"value":"light","label":"Light"},
-      {"value":"dark","label":"Dark"},
-      {"value":"system","label":"System"}
-    ],
-    "dataBinding":"/theme"
-  }}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "ChoicePicker Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/theme",
+      "value": "system"
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 8
+      },
+      "children": [
+        "label",
+        "picker"
+      ]
+    },
+    {
+      "componentId": "label",
+      "type": "Text",
+      "props": {
+        "content": "Theme",
+        "variant": "h3"
+      }
+    },
+    {
+      "componentId": "picker",
+      "type": "ChoicePicker",
+      "props": {
+        "options": [
+          {
+            "value": "light",
+            "label": "Light"
+          },
+          {
+            "value": "dark",
+            "label": "Dark"
+          },
+          {
+            "value": "system",
+            "label": "System"
+          }
+        ],
+        "dataBinding": "/theme"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

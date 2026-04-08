@@ -14,11 +14,27 @@ Every surface has a **data model** -- a JSON document that stores your app's sta
 Use `updateDataModel` to initialize values before creating components:
 
 ```json
-{"type":"updateDataModel","surfaceId":"main","ops":[
-  {"op":"add","path":"/name","value":""},
-  {"op":"add","path":"/email","value":""},
-  {"op":"add","path":"/count","value":0}
-]}
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "ops": [
+    {
+      "op": "add",
+      "path": "/name",
+      "value": ""
+    },
+    {
+      "op": "add",
+      "path": "/email",
+      "value": ""
+    },
+    {
+      "op": "add",
+      "path": "/count",
+      "value": 0
+    }
+  ]
+}
 ```
 
 ## JSON Pointer Syntax
@@ -37,9 +53,15 @@ Paths use [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) notation
 Use a **path reference** anywhere a prop accepts a dynamic value:
 
 ```json
-{"componentId":"greeting","type":"Text","props":{
-  "content": {"path": "/name"}
-}}
+{
+  "componentId": "greeting",
+  "type": "Text",
+  "props": {
+    "content": {
+      "path": "/name"
+    }
+  }
+}
 ```
 
 When `/name` changes, this Text re-renders with the new value.
@@ -49,11 +71,17 @@ When `/name` changes, this Text re-renders with the new value.
 Input components (TextField, CheckBox, Slider, SearchField) support `dataBinding` -- a JSON Pointer that creates a two-way link between the component and the data model:
 
 ```json
-{"componentId":"nameField","type":"TextField","props":{
-  "placeholder": "Enter your name",
-  "value": {"path": "/name"},
-  "dataBinding": "/name"
-}}
+{
+  "componentId": "nameField",
+  "type": "TextField",
+  "props": {
+    "placeholder": "Enter your name",
+    "value": {
+      "path": "/name"
+    },
+    "dataBinding": "/name"
+  }
+}
 ```
 
 When the user types, the data model updates at `/name`. When `/name` changes from any source, the field updates.
@@ -63,21 +91,72 @@ When the user types, the data model updates at `/name`. When `/name` changes fro
 Changes propagate automatically. Here, typing in the TextField updates the Text in real time:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Binding Demo","width":400,"height":200}
-{"type":"updateDataModel","surfaceId":"main","ops":[
-  {"op":"add","path":"/name","value":""}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"gap":12},"children":["field","display"]},
-  {"componentId":"field","type":"TextField","props":{
-    "placeholder":"Type your name",
-    "value":{"path":"/name"},
-    "dataBinding":"/name"
-  }},
-  {"componentId":"display","type":"Text","props":{
-    "content":{"functionCall":{"name":"concat","args":["Hello, ",{"path":"/name"},"!"]}}
-  }}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Binding Demo",
+  "width": 400,
+  "height": 200
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "ops": [
+    {
+      "op": "add",
+      "path": "/name",
+      "value": ""
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "gap": 12
+      },
+      "children": [
+        "field",
+        "display"
+      ]
+    },
+    {
+      "componentId": "field",
+      "type": "TextField",
+      "props": {
+        "placeholder": "Type your name",
+        "value": {
+          "path": "/name"
+        },
+        "dataBinding": "/name"
+      }
+    },
+    {
+      "componentId": "display",
+      "type": "Text",
+      "props": {
+        "content": {
+          "functionCall": {
+            "name": "concat",
+            "args": [
+              "Hello, ",
+              {
+                "path": "/name"
+              },
+              "!"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
 ```
 
 The flow:
@@ -92,11 +171,17 @@ The flow:
 CheckBox works the same way with boolean values:
 
 ```json
-{"componentId":"check","type":"CheckBox","props":{
-  "label": "Subscribe",
-  "checked": {"path": "/subscribe"},
-  "dataBinding": "/subscribe"
-}}
+{
+  "componentId": "check",
+  "type": "CheckBox",
+  "props": {
+    "label": "Subscribe",
+    "checked": {
+      "path": "/subscribe"
+    },
+    "dataBinding": "/subscribe"
+  }
+}
 ```
 
 ## Nested Paths
@@ -104,15 +189,34 @@ CheckBox works the same way with boolean values:
 Bind to any depth:
 
 ```json
-{"type":"updateDataModel","surfaceId":"main","ops":[
-  {"op":"add","path":"/user","value":{"name":"","preferences":{"darkMode":false}}}
-]}
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "ops": [
+    {
+      "op": "add",
+      "path": "/user",
+      "value": {
+        "name": "",
+        "preferences": {
+          "darkMode": false
+        }
+      }
+    }
+  ]
+}
 ```
 
 ```json
-{"componentId":"darkToggle","type":"CheckBox","props":{
-  "label":"Dark Mode",
-  "checked":{"path":"/user/preferences/darkMode"},
-  "dataBinding":"/user/preferences/darkMode"
-}}
+{
+  "componentId": "darkToggle",
+  "type": "CheckBox",
+  "props": {
+    "label": "Dark Mode",
+    "checked": {
+      "path": "/user/preferences/darkMode"
+    },
+    "dataBinding": "/user/preferences/darkMode"
+  }
+}
 ```

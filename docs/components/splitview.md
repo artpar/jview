@@ -26,16 +26,82 @@ Splits the available space between two or more child components with draggable d
 Two-pane layout with a sidebar and content area:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"SplitView Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"SplitView","props":{"vertical":true,"dividerStyle":"thin"},"children":["sidebar","content"]},
-  {"componentId":"sidebar","type":"Column","props":{"padding":8,"gap":4},"children":["nav1","nav2","nav3"]},
-  {"componentId":"nav1","type":"Text","props":{"content":"Inbox"}},
-  {"componentId":"nav2","type":"Text","props":{"content":"Drafts"}},
-  {"componentId":"nav3","type":"Text","props":{"content":"Archive"}},
-  {"componentId":"content","type":"Column","props":{"padding":16},"children":["detail"]},
-  {"componentId":"detail","type":"Text","props":{"content":"Select an item from the sidebar.","variant":"h2"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "SplitView Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "SplitView",
+      "props": {
+        "vertical": true,
+        "dividerStyle": "thin"
+      },
+      "children": [
+        "sidebar",
+        "content"
+      ]
+    },
+    {
+      "componentId": "sidebar",
+      "type": "Column",
+      "props": {
+        "padding": 8,
+        "gap": 4
+      },
+      "children": [
+        "nav1",
+        "nav2",
+        "nav3"
+      ]
+    },
+    {
+      "componentId": "nav1",
+      "type": "Text",
+      "props": {
+        "content": "Inbox"
+      }
+    },
+    {
+      "componentId": "nav2",
+      "type": "Text",
+      "props": {
+        "content": "Drafts"
+      }
+    },
+    {
+      "componentId": "nav3",
+      "type": "Text",
+      "props": {
+        "content": "Archive"
+      }
+    },
+    {
+      "componentId": "content",
+      "type": "Column",
+      "props": {
+        "padding": 16
+      },
+      "children": [
+        "detail"
+      ]
+    },
+    {
+      "componentId": "detail",
+      "type": "Text",
+      "props": {
+        "content": "Select an item from the sidebar.",
+        "variant": "h2"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

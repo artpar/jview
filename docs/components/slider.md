@@ -28,16 +28,76 @@ A horizontal slider for selecting a numeric value within a range. Supports snapp
 Font size slider with live preview:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Slider Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/fontSize","value":14}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":12},"children":["label","slider","preview"]},
-  {"componentId":"label","type":"Text","props":{"content":"Font Size","variant":"h3"}},
-  {"componentId":"slider","type":"Slider","props":{"min":8,"max":72,"step":1,"dataBinding":"/fontSize"}},
-  {"componentId":"preview","type":"Text","props":{"content":{"$concat":["Size: ",{"$ref":"/fontSize"},"pt"]}}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Slider Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/fontSize",
+      "value": 14
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 12
+      },
+      "children": [
+        "label",
+        "slider",
+        "preview"
+      ]
+    },
+    {
+      "componentId": "label",
+      "type": "Text",
+      "props": {
+        "content": "Font Size",
+        "variant": "h3"
+      }
+    },
+    {
+      "componentId": "slider",
+      "type": "Slider",
+      "props": {
+        "min": 8,
+        "max": 72,
+        "step": 1,
+        "dataBinding": "/fontSize"
+      }
+    },
+    {
+      "componentId": "preview",
+      "type": "Text",
+      "props": {
+        "content": {
+          "$concat": [
+            "Size: ",
+            {
+              "$ref": "/fontSize"
+            },
+            "pt"
+          ]
+        }
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

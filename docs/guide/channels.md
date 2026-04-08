@@ -12,7 +12,11 @@ Channels provide publish/subscribe communication between processes and the main 
 ## Creating a Channel
 
 ```json
-{"type":"createChannel","channelId":"notifications","mode":"broadcast"}
+{
+  "type": "createChannel",
+  "channelId": "notifications",
+  "mode": "broadcast"
+}
 ```
 
 Fields:
@@ -32,7 +36,11 @@ Published values are delivered round-robin to subscribers. Each value goes to ex
 Register a subscription that writes received values to a data model path:
 
 ```json
-{"type":"subscribe","channelId":"notifications","targetPath":"/lastNotification"}
+{
+  "type": "subscribe",
+  "channelId": "notifications",
+  "targetPath": "/lastNotification"
+}
 ```
 
 Fields:
@@ -47,7 +55,14 @@ When a value is published to the channel, it gets written to `/lastNotification`
 Send a value to all subscribers:
 
 ```json
-{"type":"publish","channelId":"notifications","value":{"title":"New message","body":"Hello!"}}
+{
+  "type": "publish",
+  "channelId": "notifications",
+  "value": {
+    "title": "New message",
+    "body": "Hello!"
+  }
+}
 ```
 
 The value can be any JSON type -- string, number, object, or array.
@@ -59,19 +74,30 @@ The last published value is also stored at `/channels/{channelId}/value` in the 
 Remove a specific subscription:
 
 ```json
-{"type":"unsubscribe","channelId":"notifications","targetPath":"/lastNotification"}
+{
+  "type": "unsubscribe",
+  "channelId": "notifications",
+  "targetPath": "/lastNotification"
+}
 ```
 
 Or remove all subscriptions for a process:
 
 ```json
-{"type":"unsubscribe","channelId":"notifications","processId":"worker1"}
+{
+  "type": "unsubscribe",
+  "channelId": "notifications",
+  "processId": "worker1"
+}
 ```
 
 ## Deleting a Channel
 
 ```json
-{"type":"deleteChannel","channelId":"notifications"}
+{
+  "type": "deleteChannel",
+  "channelId": "notifications"
+}
 ```
 
 This removes the channel and all its subscriptions.
@@ -79,28 +105,88 @@ This removes the channel and all its subscriptions.
 ## Example: Notification System
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Notifications","width":400,"height":300}
-{"type":"updateDataModel","surfaceId":"main","ops":[
-  {"op":"add","path":"/lastNotification","value":""}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Notifications",
+  "width": 400,
+  "height": 300
+}
 
-{"type":"createChannel","channelId":"alerts","mode":"broadcast"}
-{"type":"subscribe","channelId":"alerts","targetPath":"/lastNotification"}
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "ops": [
+    {
+      "op": "add",
+      "path": "/lastNotification",
+      "value": ""
+    }
+  ]
+}
 
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"gap":12},"children":["display","sendBtn"]},
-  {"componentId":"display","type":"Text","props":{"content":{"path":"/lastNotification"}}},
-  {"componentId":"sendBtn","type":"Button","props":{
-    "label":"Send Alert",
-    "onClick":{"action":{"event":{"name":"sendAlert"}}}
-  }}
-]}
+{
+  "type": "createChannel",
+  "channelId": "alerts",
+  "mode": "broadcast"
+}
+
+{
+  "type": "subscribe",
+  "channelId": "alerts",
+  "targetPath": "/lastNotification"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "gap": 12
+      },
+      "children": [
+        "display",
+        "sendBtn"
+      ]
+    },
+    {
+      "componentId": "display",
+      "type": "Text",
+      "props": {
+        "content": {
+          "path": "/lastNotification"
+        }
+      }
+    },
+    {
+      "componentId": "sendBtn",
+      "type": "Button",
+      "props": {
+        "label": "Send Alert",
+        "onClick": {
+          "action": {
+            "event": {
+              "name": "sendAlert"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
 ```
 
 The server can then publish to the channel:
 
 ```json
-{"type":"publish","channelId":"alerts","value":"System update available"}
+{
+  "type": "publish",
+  "channelId": "alerts",
+  "value": "System update available"
+}
 ```
 
 Every surface subscribed to `alerts` with `targetPath` of `/lastNotification` will see the update.

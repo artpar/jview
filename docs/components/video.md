@@ -31,17 +31,39 @@ Plays video from a URL or local file with native macOS playback controls.
 Video player:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Video Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16},"children":["player"]},
-  {"componentId":"player","type":"Video","props":{
-    "src":"https://example.com/demo.mp4",
-    "width":640,
-    "height":360,
-    "controls":true,
-    "autoplay":false
-  }}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Video Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16
+      },
+      "children": [
+        "player"
+      ]
+    },
+    {
+      "componentId": "player",
+      "type": "Video",
+      "props": {
+        "src": "https://example.com/demo.mp4",
+        "width": 640,
+        "height": 360,
+        "controls": true,
+        "autoplay": false
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

@@ -22,13 +22,50 @@ None. Divider has no configurable properties.
 Divider between content sections:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Divider Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":12},"children":["heading","divider","body"]},
-  {"componentId":"heading","type":"Text","props":{"content":"Section Title","variant":"h2"}},
-  {"componentId":"divider","type":"Divider"},
-  {"componentId":"body","type":"Text","props":{"content":"Content below the divider."}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Divider Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 12
+      },
+      "children": [
+        "heading",
+        "divider",
+        "body"
+      ]
+    },
+    {
+      "componentId": "heading",
+      "type": "Text",
+      "props": {
+        "content": "Section Title",
+        "variant": "h2"
+      }
+    },
+    {
+      "componentId": "divider",
+      "type": "Divider"
+    },
+    {
+      "componentId": "body",
+      "type": "Text",
+      "props": {
+        "content": "Content below the divider."
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

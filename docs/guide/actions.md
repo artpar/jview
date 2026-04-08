@@ -14,17 +14,24 @@ Actions define what happens when a user interacts with a component -- clicking a
 An event action sends a named event to the LLM or transport that created the surface. Use events when you want the server to decide what happens next.
 
 ```json
-{"componentId":"submitBtn","type":"Button","props":{
-  "label": "Submit",
-  "onClick": {
-    "action": {
-      "event": {
-        "name": "submitForm",
-        "dataRefs": ["/name", "/email"]
+{
+  "componentId": "submitBtn",
+  "type": "Button",
+  "props": {
+    "label": "Submit",
+    "onClick": {
+      "action": {
+        "event": {
+          "name": "submitForm",
+          "dataRefs": [
+            "/name",
+            "/email"
+          ]
+        }
       }
     }
   }
-}}
+}
 ```
 
 Fields:
@@ -38,21 +45,39 @@ When the user clicks Submit, the server receives an event named `submitForm` wit
 A functionCall action runs a function locally, without contacting the server. Use these for client-side state updates.
 
 ```json
-{"componentId":"addBtn","type":"Button","props":{
-  "label": "Add Item",
-  "onClick": {
-    "action": {
-      "functionCall": {
-        "call": "updateDataModel",
-        "args": {
-          "ops": [
-            {"op": "replace", "path": "/count", "value": {"functionCall": {"name": "add", "args": [{"path": "/count"}, 1]}}}
-          ]
+{
+  "componentId": "addBtn",
+  "type": "Button",
+  "props": {
+    "label": "Add Item",
+    "onClick": {
+      "action": {
+        "functionCall": {
+          "call": "updateDataModel",
+          "args": {
+            "ops": [
+              {
+                "op": "replace",
+                "path": "/count",
+                "value": {
+                  "functionCall": {
+                    "name": "add",
+                    "args": [
+                      {
+                        "path": "/count"
+                      },
+                      1
+                    ]
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     }
   }
-}}
+}
 ```
 
 ## Built-in FunctionCall Actions
@@ -62,16 +87,33 @@ A functionCall action runs a function locally, without contacting the server. Us
 The most common client-side action. Applies JSON Patch operations to the data model:
 
 ```json
-{"action": {"functionCall": {
-  "call": "updateDataModel",
-  "args": {
-    "ops": [
-      {"op": "add", "path": "/items/-", "value": {"title": "New"}},
-      {"op": "replace", "path": "/count", "value": 5},
-      {"op": "remove", "path": "/temp"}
-    ]
+{
+  "action": {
+    "functionCall": {
+      "call": "updateDataModel",
+      "args": {
+        "ops": [
+          {
+            "op": "add",
+            "path": "/items/-",
+            "value": {
+              "title": "New"
+            }
+          },
+          {
+            "op": "replace",
+            "path": "/count",
+            "value": 5
+          },
+          {
+            "op": "remove",
+            "path": "/temp"
+          }
+        ]
+      }
+    }
   }
-}}}
+}
 ```
 
 Operation types:
@@ -86,10 +128,16 @@ Values in ops can be expressions (path references or function calls), which are 
 Switch the app theme:
 
 ```json
-{"action": {"functionCall": {
-  "call": "setTheme",
-  "args": {"theme": "dark"}
-}}}
+{
+  "action": {
+    "functionCall": {
+      "call": "setTheme",
+      "args": {
+        "theme": "dark"
+      }
+    }
+  }
+}
 ```
 
 Valid themes: `"light"`, `"dark"`, `"system"`.

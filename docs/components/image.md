@@ -27,12 +27,49 @@ Loads and displays an image from a URL or local file path. Supports sizing and a
 Profile picture:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Image Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":8,"align":"center"},"children":["avatar","name"]},
-  {"componentId":"avatar","type":"Image","props":{"src":"https://example.com/avatar.jpg","alt":"User avatar","width":80,"height":80}},
-  {"componentId":"name","type":"Text","props":{"content":"Jane Smith","variant":"h3"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Image Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 8,
+        "align": "center"
+      },
+      "children": [
+        "avatar",
+        "name"
+      ]
+    },
+    {
+      "componentId": "avatar",
+      "type": "Image",
+      "props": {
+        "src": "https://example.com/avatar.jpg",
+        "alt": "User avatar",
+        "width": 80,
+        "height": 80
+      }
+    },
+    {
+      "componentId": "name",
+      "type": "Text",
+      "props": {
+        "content": "Jane Smith",
+        "variant": "h3"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

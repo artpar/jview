@@ -14,16 +14,23 @@ Any component can accept dropped files and text by adding the `onDrop` prop.
 Set `onDrop` to an action that fires when files or text are dropped:
 
 ```json
-{"componentId":"dropZone","type":"Card","props":{
-  "title": "Drop files here",
-  "onDrop": {
-    "action": {
-      "event": {
-        "name": "fileDrop"
+{
+  "componentId": "dropZone",
+  "type": "Card",
+  "props": {
+    "title": "Drop files here",
+    "onDrop": {
+      "action": {
+        "event": {
+          "name": "fileDrop"
+        }
       }
     }
-  }
-},"children":["dropText"]}
+  },
+  "children": [
+    "dropText"
+  ]
+}
 ```
 
 ## Drop Data
@@ -40,23 +47,86 @@ For an event action, this data is sent to the server alongside any `dataRefs`. F
 ## Example: File Drop Zone
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Drop Zone","width":400,"height":300}
-{"type":"updateDataModel","surfaceId":"main","ops":[
-  {"op":"add","path":"/droppedFile","value":"No file dropped yet"}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"gap":16,"padding":20},"children":["zone","result"]},
-  {"componentId":"zone","type":"Card","props":{
-    "title":"Drop Zone",
-    "onDrop":{"action":{"event":{"name":"fileDrop"}}}
-  },"children":["instructions"],"style":{"height":150}},
-  {"componentId":"instructions","type":"Text","props":{
-    "content":"Drag a file here","variant":"body"
-  },"style":{"textColor":"#888888","textAlign":"center"}},
-  {"componentId":"result","type":"Text","props":{
-    "content":{"path":"/droppedFile"},"variant":"caption"
-  }}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Drop Zone",
+  "width": 400,
+  "height": 300
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "ops": [
+    {
+      "op": "add",
+      "path": "/droppedFile",
+      "value": "No file dropped yet"
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "gap": 16,
+        "padding": 20
+      },
+      "children": [
+        "zone",
+        "result"
+      ]
+    },
+    {
+      "componentId": "zone",
+      "type": "Card",
+      "props": {
+        "title": "Drop Zone",
+        "onDrop": {
+          "action": {
+            "event": {
+              "name": "fileDrop"
+            }
+          }
+        }
+      },
+      "children": [
+        "instructions"
+      ],
+      "style": {
+        "height": 150
+      }
+    },
+    {
+      "componentId": "instructions",
+      "type": "Text",
+      "props": {
+        "content": "Drag a file here",
+        "variant": "body"
+      },
+      "style": {
+        "textColor": "#888888",
+        "textAlign": "center"
+      }
+    },
+    {
+      "componentId": "result",
+      "type": "Text",
+      "props": {
+        "content": {
+          "path": "/droppedFile"
+        },
+        "variant": "caption"
+      }
+    }
+  ]
+}
 ```
 
 ## Accepted Drop Types
@@ -73,10 +143,26 @@ Both can be present in the same drop if the source provides both types.
 The `onDrop` prop works on any component type, not just Card:
 
 ```json
-{"componentId":"imageTarget","type":"Image","props":{
-  "src": {"path": "/imagePath"},
-  "onDrop": {"action": {"event": {"name": "imageDropped"}}}
-},"style":{"width":200,"height":200}}
+{
+  "componentId": "imageTarget",
+  "type": "Image",
+  "props": {
+    "src": {
+      "path": "/imagePath"
+    },
+    "onDrop": {
+      "action": {
+        "event": {
+          "name": "imageDropped"
+        }
+      }
+    }
+  },
+  "style": {
+    "width": 200,
+    "height": 200
+  }
+}
 ```
 
 ## Implementation Note

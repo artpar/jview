@@ -23,13 +23,54 @@ Renders static or dynamic text with variant-based styling. Use Text for headings
 Heading and body text:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Text Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":8},"children":["heading","body","caption"]},
-  {"componentId":"heading","type":"Text","props":{"content":"Welcome to Canopy","variant":"h1"}},
-  {"componentId":"body","type":"Text","props":{"content":"Canopy renders native macOS components from JSONL."}},
-  {"componentId":"caption","type":"Text","props":{"content":"Built with AppKit","variant":"caption"}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Text Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 8
+      },
+      "children": [
+        "heading",
+        "body",
+        "caption"
+      ]
+    },
+    {
+      "componentId": "heading",
+      "type": "Text",
+      "props": {
+        "content": "Welcome to Canopy",
+        "variant": "h1"
+      }
+    },
+    {
+      "componentId": "body",
+      "type": "Text",
+      "props": {
+        "content": "Canopy renders native macOS components from JSONL."
+      }
+    },
+    {
+      "componentId": "caption",
+      "type": "Text",
+      "props": {
+        "content": "Built with AppKit",
+        "variant": "caption"
+      }
+    }
+  ]
+}
 ```
 
 ## Variant Sizes

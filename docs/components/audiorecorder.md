@@ -28,21 +28,83 @@ Records audio from the microphone. Renders as a compact 40-point bar with a reco
 Voice memo recorder:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"AudioRecorder Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/recordings","value":[]},
-  {"op":"replace","path":"/isRecording","value":false}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":12},"children":["heading","recorder"]},
-  {"componentId":"heading","type":"Text","props":{"content":"Voice Memos","variant":"h2"}},
-  {"componentId":"recorder","type":"AudioRecorder","props":{
-    "format":"m4a",
-    "sampleRate":44100,
-    "onRecordingStarted":{"action":{"setValues":[{"path":"/isRecording","value":true}]}},
-    "onRecordingStopped":{"action":{"setValues":[{"path":"/isRecording","value":false}]}}
-  }}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "AudioRecorder Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/recordings",
+      "value": []
+    },
+    {
+      "op": "replace",
+      "path": "/isRecording",
+      "value": false
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 12
+      },
+      "children": [
+        "heading",
+        "recorder"
+      ]
+    },
+    {
+      "componentId": "heading",
+      "type": "Text",
+      "props": {
+        "content": "Voice Memos",
+        "variant": "h2"
+      }
+    },
+    {
+      "componentId": "recorder",
+      "type": "AudioRecorder",
+      "props": {
+        "format": "m4a",
+        "sampleRate": 44100,
+        "onRecordingStarted": {
+          "action": {
+            "setValues": [
+              {
+                "path": "/isRecording",
+                "value": true
+              }
+            ]
+          }
+        },
+        "onRecordingStopped": {
+          "action": {
+            "setValues": [
+              {
+                "path": "/isRecording",
+                "value": false
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

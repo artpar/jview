@@ -12,15 +12,34 @@ Use `defineFunction` to create named, parametric functions that can be called fr
 ## Defining a Function
 
 ```json
-{"type":"defineFunction","name":"appendDigit","params":["digit"],
-  "body":{
-    "functionCall":{
-      "call":"updateDataModel",
-      "args":{
-        "ops":[
-          {"op":"replace","path":"/display","value":{
-            "functionCall":{"name":"concat","args":[{"path":"/display"},{"param":"digit"}]}
-          }}
+{
+  "type": "defineFunction",
+  "name": "appendDigit",
+  "params": [
+    "digit"
+  ],
+  "body": {
+    "functionCall": {
+      "call": "updateDataModel",
+      "args": {
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/display",
+            "value": {
+              "functionCall": {
+                "name": "concat",
+                "args": [
+                  {
+                    "path": "/display"
+                  },
+                  {
+                    "param": "digit"
+                  }
+                ]
+              }
+            }
+          }
         ]
       }
     }
@@ -47,27 +66,67 @@ When you call a user-defined function:
 In an expression:
 
 ```json
-{"functionCall": {"name": "appendDigit", "args": ["5"]}}
+{
+  "functionCall": {
+    "name": "appendDigit",
+    "args": [
+      "5"
+    ]
+  }
+}
 ```
 
 In an action:
 
 ```json
-{"props": {"onClick": {"action": {"functionCall": {"call": "appendDigit", "args": ["5"]}}}}}
+{
+  "props": {
+    "onClick": {
+      "action": {
+        "functionCall": {
+          "call": "appendDigit",
+          "args": [
+            "5"
+          ]
+        }
+      }
+    }
+  }
+}
 ```
 
 ## Example: Toggle Boolean
 
 ```json
-{"type":"defineFunction","name":"toggleFlag","params":["path"],
-  "body":{
-    "functionCall":{
-      "call":"updateDataModel",
-      "args":{
-        "ops":[
-          {"op":"replace","path":{"param":"path"},"value":{
-            "functionCall":{"name":"not","args":[{"path":{"param":"path"}}]}
-          }}
+{
+  "type": "defineFunction",
+  "name": "toggleFlag",
+  "params": [
+    "path"
+  ],
+  "body": {
+    "functionCall": {
+      "call": "updateDataModel",
+      "args": {
+        "ops": [
+          {
+            "op": "replace",
+            "path": {
+              "param": "path"
+            },
+            "value": {
+              "functionCall": {
+                "name": "not",
+                "args": [
+                  {
+                    "path": {
+                      "param": "path"
+                    }
+                  }
+                ]
+              }
+            }
+          }
         ]
       }
     }
@@ -78,10 +137,23 @@ In an action:
 Usage:
 
 ```json
-{"componentId":"toggle","type":"Button","props":{
-  "label":"Toggle Dark Mode",
-  "onClick":{"action":{"functionCall":{"call":"toggleFlag","args":["/settings/darkMode"]}}}
-}}
+{
+  "componentId": "toggle",
+  "type": "Button",
+  "props": {
+    "label": "Toggle Dark Mode",
+    "onClick": {
+      "action": {
+        "functionCall": {
+          "call": "toggleFlag",
+          "args": [
+            "/settings/darkMode"
+          ]
+        }
+      }
+    }
+  }
+}
 ```
 
 ## Resolution Order

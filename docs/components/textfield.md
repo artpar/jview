@@ -29,16 +29,68 @@ Accepts user text input with support for different input modes, placeholder text
 Name input with data binding:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"TextField Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/name","value":""}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":16,"gap":8},"children":["label","input","preview"]},
-  {"componentId":"label","type":"Text","props":{"content":"Name","variant":"h3"}},
-  {"componentId":"input","type":"TextField","props":{"placeholder":"Enter your name","dataBinding":"/name"}},
-  {"componentId":"preview","type":"Text","props":{"content":{"$ref":"/name"}}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "TextField Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/name",
+      "value": ""
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 16,
+        "gap": 8
+      },
+      "children": [
+        "label",
+        "input",
+        "preview"
+      ]
+    },
+    {
+      "componentId": "label",
+      "type": "Text",
+      "props": {
+        "content": "Name",
+        "variant": "h3"
+      }
+    },
+    {
+      "componentId": "input",
+      "type": "TextField",
+      "props": {
+        "placeholder": "Enter your name",
+        "dataBinding": "/name"
+      }
+    },
+    {
+      "componentId": "preview",
+      "type": "Text",
+      "props": {
+        "content": {
+          "$ref": "/name"
+        }
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

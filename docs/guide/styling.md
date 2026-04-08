@@ -28,15 +28,20 @@ Every component accepts a `style` object that controls its visual appearance. Al
 ## Example: Styled Button
 
 ```json
-{"componentId":"submit","type":"Button","props":{
-  "label": "Submit",
-  "style": "primary"
-},"style":{
-  "backgroundColor": "#007AFF",
-  "cornerRadius": 8,
-  "fontSize": 16,
-  "fontWeight": "bold"
-}}
+{
+  "componentId": "submit",
+  "type": "Button",
+  "props": {
+    "label": "Submit",
+    "style": "primary"
+  },
+  "style": {
+    "backgroundColor": "#007AFF",
+    "cornerRadius": 8,
+    "fontSize": 16,
+    "fontWeight": "bold"
+  }
+}
 ```
 
 ## Dynamic Styles
@@ -44,18 +49,37 @@ Every component accepts a `style` object that controls its visual appearance. Al
 Style values can reference the data model:
 
 ```json
-{"componentId":"status","type":"Text","props":{
-  "content": {"path": "/message"}
-},"style":{
-  "textColor": {"functionCall": {
-    "name": "if",
-    "args": [
-      {"functionCall": {"name": "equals", "args": [{"path": "/status"}, "error"]}},
-      "#FF3B30",
-      "#34C759"
-    ]
-  }}
-}}
+{
+  "componentId": "status",
+  "type": "Text",
+  "props": {
+    "content": {
+      "path": "/message"
+    }
+  },
+  "style": {
+    "textColor": {
+      "functionCall": {
+        "name": "if",
+        "args": [
+          {
+            "functionCall": {
+              "name": "equals",
+              "args": [
+                {
+                  "path": "/status"
+                },
+                "error"
+              ]
+            }
+          },
+          "#FF3B30",
+          "#34C759"
+        ]
+      }
+    }
+  }
+}
 ```
 
 ## Surface-Level Styling
@@ -63,10 +87,14 @@ Style values can reference the data model:
 The `createSurface` message accepts `backgroundColor` and `padding` for the window itself:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Styled App",
-  "width":600,"height":400,
-  "backgroundColor":"#1E1E1E",
-  "padding":20
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Styled App",
+  "width": 600,
+  "height": 400,
+  "backgroundColor": "#1E1E1E",
+  "padding": 20
 }
 ```
 
@@ -75,11 +103,43 @@ The `createSurface` message accepts `backgroundColor` and `padding` for the wind
 Use `flexGrow` to make a component expand within its parent Row or Column:
 
 ```json
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"row","type":"Row","props":{"gap":8},"children":["sidebar","content"]},
-  {"componentId":"sidebar","type":"Column","children":["nav"],"style":{"width":200}},
-  {"componentId":"content","type":"Column","children":["main"],"style":{"flexGrow":1}}
-]}
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "row",
+      "type": "Row",
+      "props": {
+        "gap": 8
+      },
+      "children": [
+        "sidebar",
+        "content"
+      ]
+    },
+    {
+      "componentId": "sidebar",
+      "type": "Column",
+      "children": [
+        "nav"
+      ],
+      "style": {
+        "width": 200
+      }
+    },
+    {
+      "componentId": "content",
+      "type": "Column",
+      "children": [
+        "main"
+      ],
+      "style": {
+        "flexGrow": 1
+      }
+    }
+  ]
+}
 ```
 
 The sidebar has a fixed 200pt width. The content area expands to fill the remaining space.
@@ -92,7 +152,14 @@ Layout properties like `gap`, `padding`, `justify`, and `align` live in `props`,
 {
   "componentId": "container",
   "type": "Column",
-  "props": {"gap": 16, "padding": 20, "align": "center"},
-  "style": {"backgroundColor": "#F5F5F5", "cornerRadius": 12}
+  "props": {
+    "gap": 16,
+    "padding": 20,
+    "align": "center"
+  },
+  "style": {
+    "backgroundColor": "#F5F5F5",
+    "cornerRadius": 12
+  }
 }
 ```

@@ -25,13 +25,56 @@ Displays a system icon from Apple's SF Symbols library. Over 5,000 symbols are a
 Icons in a toolbar:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Icon Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Row","props":{"gap":16,"padding":12,"align":"center"},"children":["home","search","settings"]},
-  {"componentId":"home","type":"Icon","props":{"name":"house.fill","size":20}},
-  {"componentId":"search","type":"Icon","props":{"name":"magnifyingglass","size":20}},
-  {"componentId":"settings","type":"Icon","props":{"name":"gear","size":20}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Icon Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Row",
+      "props": {
+        "gap": 16,
+        "padding": 12,
+        "align": "center"
+      },
+      "children": [
+        "home",
+        "search",
+        "settings"
+      ]
+    },
+    {
+      "componentId": "home",
+      "type": "Icon",
+      "props": {
+        "name": "house.fill",
+        "size": 20
+      }
+    },
+    {
+      "componentId": "search",
+      "type": "Icon",
+      "props": {
+        "name": "magnifyingglass",
+        "size": 20
+      }
+    },
+    {
+      "componentId": "settings",
+      "type": "Icon",
+      "props": {
+        "name": "gear",
+        "size": 20
+      }
+    }
+  ]
+}
 ```
 
 ## Common SF Symbols

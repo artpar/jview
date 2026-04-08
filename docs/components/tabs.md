@@ -26,14 +26,68 @@ Displays multiple panels with tab labels at the top. Only one tab is visible at 
 Settings panel with two tabs:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"Tabs Example"}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Tabs","props":{"tabLabels":["General","Advanced"]},"children":["general","advanced"]},
-  {"componentId":"general","type":"Column","props":{"padding":12,"gap":8},"children":["g1"]},
-  {"componentId":"g1","type":"Text","props":{"content":"General settings go here."}},
-  {"componentId":"advanced","type":"Column","props":{"padding":12,"gap":8},"children":["a1"]},
-  {"componentId":"a1","type":"Text","props":{"content":"Advanced settings go here."}}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "Tabs Example"
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Tabs",
+      "props": {
+        "tabLabels": [
+          "General",
+          "Advanced"
+        ]
+      },
+      "children": [
+        "general",
+        "advanced"
+      ]
+    },
+    {
+      "componentId": "general",
+      "type": "Column",
+      "props": {
+        "padding": 12,
+        "gap": 8
+      },
+      "children": [
+        "g1"
+      ]
+    },
+    {
+      "componentId": "g1",
+      "type": "Text",
+      "props": {
+        "content": "General settings go here."
+      }
+    },
+    {
+      "componentId": "advanced",
+      "type": "Column",
+      "props": {
+        "padding": 12,
+        "gap": 8
+      },
+      "children": [
+        "a1"
+      ]
+    },
+    {
+      "componentId": "a1",
+      "type": "Text",
+      "props": {
+        "content": "Advanced settings go here."
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

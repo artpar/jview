@@ -32,23 +32,60 @@ Displays a tree structure with expandable/collapsible nodes. Ideal for file brow
 Folder tree:
 
 ```json
-{"type":"createSurface","surfaceId":"main","title":"OutlineView Example"}
-{"type":"updateDataModel","surfaceId":"main","operations":[
-  {"op":"replace","path":"/selectedFolder","value":""},
-  {"op":"replace","path":"/folders","value":"[{\"id\":\"inbox\",\"name\":\"Inbox\",\"icon\":\"tray\",\"badge\":3},{\"id\":\"projects\",\"name\":\"Projects\",\"icon\":\"folder\",\"children\":[{\"id\":\"p1\",\"name\":\"Website Redesign\",\"icon\":\"doc\"},{\"id\":\"p2\",\"name\":\"Mobile App\",\"icon\":\"doc\"}]},{\"id\":\"archive\",\"name\":\"Archive\",\"icon\":\"archivebox\"}]"}
-]}
-{"type":"updateComponents","surfaceId":"main","components":[
-  {"componentId":"root","type":"Column","props":{"padding":0},"children":["tree"]},
-  {"componentId":"tree","type":"OutlineView","props":{
-    "outlineData":{"$ref":"/folders"},
-    "labelKey":"name",
-    "childrenKey":"children",
-    "iconKey":"icon",
-    "idKey":"id",
-    "badgeKey":"badge",
-    "dataBinding":"/selectedFolder"
-  }}
-]}
+{
+  "type": "createSurface",
+  "surfaceId": "main",
+  "title": "OutlineView Example"
+}
+
+{
+  "type": "updateDataModel",
+  "surfaceId": "main",
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/selectedFolder",
+      "value": ""
+    },
+    {
+      "op": "replace",
+      "path": "/folders",
+      "value": "[{\"id\":\"inbox\",\"name\":\"Inbox\",\"icon\":\"tray\",\"badge\":3},{\"id\":\"projects\",\"name\":\"Projects\",\"icon\":\"folder\",\"children\":[{\"id\":\"p1\",\"name\":\"Website Redesign\",\"icon\":\"doc\"},{\"id\":\"p2\",\"name\":\"Mobile App\",\"icon\":\"doc\"}]},{\"id\":\"archive\",\"name\":\"Archive\",\"icon\":\"archivebox\"}]"
+    }
+  ]
+}
+
+{
+  "type": "updateComponents",
+  "surfaceId": "main",
+  "components": [
+    {
+      "componentId": "root",
+      "type": "Column",
+      "props": {
+        "padding": 0
+      },
+      "children": [
+        "tree"
+      ]
+    },
+    {
+      "componentId": "tree",
+      "type": "OutlineView",
+      "props": {
+        "outlineData": {
+          "$ref": "/folders"
+        },
+        "labelKey": "name",
+        "childrenKey": "children",
+        "iconKey": "icon",
+        "idKey": "id",
+        "badgeKey": "badge",
+        "dataBinding": "/selectedFolder"
+      }
+    }
+  ]
+}
 ```
 
 ## Notes

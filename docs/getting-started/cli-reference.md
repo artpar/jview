@@ -20,6 +20,7 @@ Canopy runs in several modes depending on the arguments you pass:
 | MCP Server | `canopy mcp [file.jsonl]` | Start as an embedded MCP server on stdin/stdout |
 | Tray | `canopy` (no args) | Menubar-only mode with system tray icon |
 | Package | `canopy pkg <cmd>` | Package management (install, publish, search) |
+| Bundle | `canopy bundle <app-path>` | Create a standalone macOS `.app` from a Canopy app |
 
 ## Flags
 
@@ -55,6 +56,43 @@ Manage reusable components shared through GitHub:
 | `canopy pkg update [<owner/name>]` | Update one or all packages |
 | `canopy pkg list` | List installed packages |
 | `canopy pkg publish [path] [--repo=owner/repo]` | Publish a package to GitHub |
+
+## Bundle Command
+
+Create standalone macOS `.app` bundles from any Canopy app. The bundled app is self-contained --- double-click to launch, no CLI needed.
+
+```bash
+canopy bundle <app-path> [flags]
+```
+
+The `<app-path>` can be a directory containing JSONL files, or `owner/repo` to bundle an installed package.
+
+**Flags:**
+
+| Flag | Description |
+|:-----|:------------|
+| `--output`, `-o` | Output path for the `.app` bundle (default: `./<AppName>.app`) |
+| `--name` | Override the app name (default: from `canopy.json` or directory name) |
+| `--icon` | Path to an `.icns` file for the app icon |
+| `--bundle-id` | Override the macOS bundle identifier (default: `com.canopy.app.<name>`) |
+
+**Examples:**
+
+```bash
+# Bundle a local app directory
+canopy bundle myapp/
+
+# Bundle with a custom output path
+canopy bundle -o ~/Desktop/Notes.app sample_apps/notes
+
+# Bundle an installed package
+canopy bundle artpar/calculator
+
+# Bundle with custom icon and bundle ID
+canopy bundle --icon icon.icns --bundle-id com.example.myapp myapp/
+```
+
+The bundled binary auto-detects that it is inside a `.app` and launches as a normal dock application. Metadata (name, version, icon, bundle ID) is read from `canopy.json` if present, with flag overrides taking precedence.
 
 ## Make Targets
 
@@ -122,4 +160,8 @@ build/canopy --mcp-http localhost:8080 mcp
 canopy pkg search "todo"
 canopy pkg install artpar/canopy-components
 canopy pkg list
+
+# Bundle an app into a standalone .app
+canopy bundle myapp/
+canopy bundle -o ~/Desktop/Notes.app sample_apps/notes
 ```
