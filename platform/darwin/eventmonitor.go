@@ -17,12 +17,14 @@ import (
 // These are installed/updated generically in CreateView/UpdateView rather than
 // by component-specific code.
 var eventMonitorEvents = map[string]bool{
-	"mouseEnter": true,
-	"mouseLeave": true,
+	"mouseEnter":  true,
+	"mouseLeave":  true,
 	"doubleClick": true,
 	"rightClick":  true,
 	"focus":       true,
 	"blur":        true,
+	"keyDown":     true,
+	"keyUp":       true,
 }
 
 func installEventMonitor(handle renderer.ViewHandle, eventName string, callbackID uint64) {

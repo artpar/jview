@@ -815,11 +815,64 @@ func (s *Surface) rerenderAffectedExcluding(excludeID string, changed []string) 
 	}
 }
 
+// matchesFilter checks whether native event data satisfies an EventFilter.
+// Returns true if no filter is set or if the event matches the filter criteria.
+func matchesFilter(filter *protocol.EventFilter, nativeData string) bool {
+	if filter == nil {
+		return true
+	}
+
+	// Parse native data to check against filter
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(nativeData), &data); err != nil {
+		return false
+	}
+
+	// Key filter: check if the event's "key" field matches
+	if filter.Key != "" {
+		eventKey, _ := data["key"].(string)
+		if eventKey != filter.Key {
+			return false
+		}
+	}
+
+	// Modifier filter: all specified modifiers must be present
+	if len(filter.Modifiers) > 0 {
+		eventMods, _ := data["modifiers"].([]interface{})
+		modSet := make(map[string]bool, len(eventMods))
+		for _, m := range eventMods {
+			if s, ok := m.(string); ok {
+				modSet[s] = true
+			}
+		}
+		for _, required := range filter.Modifiers {
+			if !modSet[required] {
+				return false
+			}
+		}
+	}
+
+	// Button filter: check mouse button (only applies if Button > 0 to avoid false match on default 0)
+	if filter.Button > 0 {
+		eventButton, _ := data["button"].(float64)
+		if int(eventButton) != filter.Button {
+			return false
+		}
+	}
+
+	return true
+}
+
 // executeEventAction dispatches an event action: writes to DataPath, then fires
 // the Action (event/functionCall/standardAction). Native event data is merged into
 // server event resolved maps and made available at /_input for dataRefs.
 func (s *Surface) executeEventAction(ea *protocol.EventAction, nativeData string) {
 	if ea == nil {
+		return
+	}
+
+	// Check filter — skip if event doesn't match
+	if !matchesFilter(ea.Filter, nativeData) {
 		return
 	}
 

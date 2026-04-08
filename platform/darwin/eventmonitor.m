@@ -29,6 +29,12 @@ static const void *kEventMonitorSetKey = &kEventMonitorSetKey;
 @property (nonatomic, assign) uint64_t blurCbID;
 @property (nonatomic, assign) BOOL isFocused;
 @property (nonatomic, assign) BOOL observingFirstResponder;
+
+// Keyboard events via NSEvent local monitors
+@property (nonatomic, assign) uint64_t keyDownCbID;
+@property (nonatomic, assign) uint64_t keyUpCbID;
+@property (nonatomic, strong) id keyDownMonitor;
+@property (nonatomic, strong) id keyUpMonitor;
 @end
 
 @implementation JVEventMonitorSet
@@ -38,6 +44,7 @@ static const void *kEventMonitorSetKey = &kEventMonitorSetKey;
     [self removeMouseTracking];
     [self removeDoubleClickGesture];
     [self removeRightClickGesture];
+    [self removeKeyboardMonitors];
 }
 
 #pragma mark - Mouse Enter/Leave (NSTrackingArea)
@@ -233,6 +240,119 @@ static const void *kEventMonitorSetKey = &kEventMonitorSetKey;
     self.isFocused = NO;
 }
 
+#pragma mark - Keyboard Events (NSEvent local monitor)
+
+// Build a JSON string for key event data.
+// Format: {"key":"Enter","modifiers":["cmd","shift"],"characters":"\\r","keyCode":36,"repeat":false}
+static NSString* keyEventJSON(NSEvent *event) {
+    // Map special keys to readable names
+    NSString *key = event.charactersIgnoringModifiers ?: @"";
+    unichar ch = key.length > 0 ? [key characterAtIndex:0] : 0;
+
+    // Named keys for special characters
+    switch (ch) {
+        case NSCarriageReturnCharacter: key = @"Enter"; break;
+        case NSTabCharacter: key = @"Tab"; break;
+        case 0x1B: key = @"Escape"; break;
+        case NSBackspaceCharacter:
+        case NSDeleteCharacter: key = @"Backspace"; break;
+        case NSDeleteFunctionKey: key = @"Delete"; break;
+        case NSUpArrowFunctionKey: key = @"ArrowUp"; break;
+        case NSDownArrowFunctionKey: key = @"ArrowDown"; break;
+        case NSLeftArrowFunctionKey: key = @"ArrowLeft"; break;
+        case NSRightArrowFunctionKey: key = @"ArrowRight"; break;
+        case NSHomeFunctionKey: key = @"Home"; break;
+        case NSEndFunctionKey: key = @"End"; break;
+        case NSPageUpFunctionKey: key = @"PageUp"; break;
+        case NSPageDownFunctionKey: key = @"PageDown"; break;
+        case ' ': key = @"Space"; break;
+        default:
+            // For F-keys
+            if (ch >= NSF1FunctionKey && ch <= NSF35FunctionKey) {
+                key = [NSString stringWithFormat:@"F%d", (int)(ch - NSF1FunctionKey + 1)];
+            }
+            break;
+    }
+
+    // Build modifiers array
+    NSEventModifierFlags flags = event.modifierFlags;
+    NSMutableArray *mods = [NSMutableArray array];
+    if (flags & NSEventModifierFlagCommand) [mods addObject:@"\"cmd\""];
+    if (flags & NSEventModifierFlagShift)   [mods addObject:@"\"shift\""];
+    if (flags & NSEventModifierFlagOption)  [mods addObject:@"\"option\""];
+    if (flags & NSEventModifierFlagControl) [mods addObject:@"\"ctrl\""];
+
+    NSString *modsStr = [mods componentsJoinedByString:@","];
+
+    // Escape the characters for JSON
+    NSString *chars = event.characters ?: @"";
+    chars = [chars stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
+    chars = [chars stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
+    chars = [chars stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"];
+    chars = [chars stringByReplacingOccurrencesOfString:@"\r" withString:@"\\r"];
+    chars = [chars stringByReplacingOccurrencesOfString:@"\t" withString:@"\\t"];
+
+    return [NSString stringWithFormat:
+        @"{\"key\":\"%@\",\"modifiers\":[%@],\"characters\":\"%@\",\"keyCode\":%hu,\"repeat\":%@}",
+        key, modsStr, chars, event.keyCode, event.isARepeat ? @"true" : @"false"];
+}
+
+- (BOOL)isViewOrDescendantFirstResponder {
+    NSView *view = self.view;
+    if (!view || !view.window) return NO;
+    NSResponder *fr = view.window.firstResponder;
+    if (fr == view) return YES;
+    if ([fr isKindOfClass:[NSView class]]) {
+        return [(NSView *)fr isDescendantOf:view];
+    }
+    return NO;
+}
+
+- (void)installKeyDownMonitor {
+    if (self.keyDownMonitor) return;
+
+    __weak JVEventMonitorSet *weakSelf = self;
+    self.keyDownMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown
+        handler:^NSEvent *(NSEvent *event) {
+            JVEventMonitorSet *strongSelf = weakSelf;
+            if (!strongSelf || !strongSelf.keyDownCbID) return event;
+            if (![strongSelf isViewOrDescendantFirstResponder]) return event;
+
+            NSString *json = keyEventJSON(event);
+            GoCallbackInvoke(strongSelf.keyDownCbID, [json UTF8String]);
+            return event;
+        }];
+}
+
+- (void)installKeyUpMonitor {
+    if (self.keyUpMonitor) return;
+
+    __weak JVEventMonitorSet *weakSelf = self;
+    self.keyUpMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp
+        handler:^NSEvent *(NSEvent *event) {
+            JVEventMonitorSet *strongSelf = weakSelf;
+            if (!strongSelf || !strongSelf.keyUpCbID) return event;
+            if (![strongSelf isViewOrDescendantFirstResponder]) return event;
+
+            NSString *json = keyEventJSON(event);
+            GoCallbackInvoke(strongSelf.keyUpCbID, [json UTF8String]);
+            return event;
+        }];
+}
+
+- (void)removeKeyboardMonitors {
+    if (self.keyDownMonitor) {
+        [NSEvent removeMonitor:self.keyDownMonitor];
+        self.keyDownMonitor = nil;
+    }
+    if (self.keyUpMonitor) {
+        [NSEvent removeMonitor:self.keyUpMonitor];
+        self.keyUpMonitor = nil;
+    }
+    self.keyDownCbID = 0;
+    self.keyUpCbID = 0;
+}
+
 #pragma mark - Cleanup
 
 - (void)removeAll {
@@ -240,6 +360,7 @@ static const void *kEventMonitorSetKey = &kEventMonitorSetKey;
     [self removeDoubleClickGesture];
     [self removeRightClickGesture];
     [self removeFocusMonitor];
+    [self removeKeyboardMonitors];
 }
 
 @end
@@ -287,6 +408,12 @@ void JVInstallEventMonitor(void* handle, const char* eventName, uint64_t callbac
     } else if ([name isEqualToString:@"blur"]) {
         set.blurCbID = callbackID;
         if (!set.observingFirstResponder) [set installFocusMonitor];
+    } else if ([name isEqualToString:@"keyDown"]) {
+        set.keyDownCbID = callbackID;
+        [set installKeyDownMonitor];
+    } else if ([name isEqualToString:@"keyUp"]) {
+        set.keyUpCbID = callbackID;
+        [set installKeyUpMonitor];
     }
 }
 
@@ -312,6 +439,10 @@ void JVUpdateEventMonitorCallbackID(void* handle, const char* eventName, uint64_
         set.focusCbID = callbackID;
     } else if ([name isEqualToString:@"blur"]) {
         set.blurCbID = callbackID;
+    } else if ([name isEqualToString:@"keyDown"]) {
+        set.keyDownCbID = callbackID;
+    } else if ([name isEqualToString:@"keyUp"]) {
+        set.keyUpCbID = callbackID;
     }
 }
 

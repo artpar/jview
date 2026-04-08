@@ -1,0 +1,47 @@
+{"type": "createSurface", "surfaceId": "main", "title": "Keyboard Shortcuts", "width": 400, "height": 300}
+{"type": "updateDataModel", "surfaceId": "main", "ops": [
+  {"op": "add", "path": "/lastKey", "value": ""},
+  {"op": "add", "path": "/saved", "value": false}
+]}
+{"type": "updateComponents", "surfaceId": "main", "components": [
+  {
+    "componentId": "root",
+    "type": "Column",
+    "props": {"padding": 20, "gap": 12},
+    "children": ["title", "field", "status", "save-status"]
+  },
+  {
+    "componentId": "title",
+    "type": "Text",
+    "props": {"content": "Keyboard Event Demo", "variant": "h1"}
+  },
+  {
+    "componentId": "field",
+    "type": "TextField",
+    "props": {
+      "placeholder": "Type here... (Cmd+S to save)",
+      "dataBinding": "/text",
+      "on": {
+        "keyDown": {"dataPath": "/lastKey"},
+        "focus": {"dataPath": "/focused", "dataValue": true},
+        "blur": {"dataPath": "/focused", "dataValue": false}
+      }
+    }
+  },
+  {
+    "componentId": "status",
+    "type": "Text",
+    "props": {
+      "content": {"functionCall": {"name": "concat", "args": ["Last key: ", {"path": "/lastKey"}]}},
+      "variant": "caption"
+    }
+  },
+  {
+    "componentId": "save-status",
+    "type": "Text",
+    "props": {
+      "content": {"functionCall": {"name": "if", "args": [{"path": "/saved"}, "Saved!", "Not saved"]}},
+      "variant": "body"
+    }
+  }
+]}

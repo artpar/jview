@@ -1831,3 +1831,112 @@ func TestOnMapWinsOverNamedProp(t *testing.T) {
 		t.Errorf("firedEvent = %q, want fromOnMap (on map should win)", firedEvent)
 	}
 }
+
+func TestKeyDownWithFilter(t *testing.T) {
+	// Verify that a keyDown handler with filter only fires for matching keys
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	var firedEvent string
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"field","type":"TextField","props":{"placeholder":"Type...","on":{"keyDown":{"filter":{"key":"Enter"},"action":{"event":{"name":"submitted"}}}}}}]}`)
+
+	if surf, ok := sess.surfaces["s1"]; ok {
+		surf.ActionHandler = func(sid string, event *protocol.EventDef, data map[string]interface{}) {
+			firedEvent = event.Name
+		}
+	}
+
+	// Non-matching key: should NOT fire
+	mock.InvokeCallback("s1", "field", "keyDown", `{"key":"a","modifiers":[],"keyCode":0,"repeat":false}`)
+	if firedEvent != "" {
+		t.Errorf("non-matching key fired event: %q", firedEvent)
+	}
+
+	// Matching key: should fire
+	mock.InvokeCallback("s1", "field", "keyDown", `{"key":"Enter","modifiers":[],"keyCode":36,"repeat":false}`)
+	if firedEvent != "submitted" {
+		t.Errorf("firedEvent = %q, want submitted", firedEvent)
+	}
+}
+
+func TestKeyDownWithModifierFilter(t *testing.T) {
+	// Verify that modifier filtering works (Cmd+S)
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	var firedEvent string
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"editor","type":"Card","props":{"title":"Editor","on":{"keyDown":{"filter":{"key":"s","modifiers":["cmd"]},"action":{"event":{"name":"save"}}}}}}]}`)
+
+	if surf, ok := sess.surfaces["s1"]; ok {
+		surf.ActionHandler = func(sid string, event *protocol.EventDef, data map[string]interface{}) {
+			firedEvent = event.Name
+		}
+	}
+
+	// Just "s" without cmd: should NOT fire
+	mock.InvokeCallback("s1", "editor", "keyDown", `{"key":"s","modifiers":[],"keyCode":1,"repeat":false}`)
+	if firedEvent != "" {
+		t.Errorf("s without cmd fired: %q", firedEvent)
+	}
+
+	// Cmd+S: should fire
+	mock.InvokeCallback("s1", "editor", "keyDown", `{"key":"s","modifiers":["cmd"],"keyCode":1,"repeat":false}`)
+	if firedEvent != "save" {
+		t.Errorf("firedEvent = %q, want save", firedEvent)
+	}
+}
+
+func TestKeyDownDataPathWithoutFilter(t *testing.T) {
+	// Verify keyDown with dataPath captures all key presses
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/lastKey","value":""}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"area","type":"Card","props":{"title":"Keys","on":{"keyDown":{"dataPath":"/lastKey"}}}}]}`)
+
+	mock.InvokeCallback("s1", "area", "keyDown", `{"key":"Enter","modifiers":["cmd"],"keyCode":36,"repeat":false}`)
+
+	if surf, ok := sess.surfaces["s1"]; ok {
+		val, found := surf.dm.Get("/lastKey")
+		if !found {
+			t.Fatal("/lastKey not found")
+		}
+		// DataPath with nil DataValue writes the parsed native data
+		valMap, ok := val.(map[string]interface{})
+		if !ok {
+			t.Fatalf("/lastKey is %T, want map", val)
+		}
+		if valMap["key"] != "Enter" {
+			t.Errorf("key = %v, want Enter", valMap["key"])
+		}
+	}
+}
+
+func TestKeyDownCallbackRegistration(t *testing.T) {
+	// Verify keyDown/keyUp produce callbacks in the render node
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"area","type":"Card","props":{"title":"Keys","on":{"keyDown":{"action":{"event":{"name":"kd"}}},"keyUp":{"action":{"event":{"name":"ku"}}}}}}]}`)
+
+	for _, c := range mock.Created {
+		if c.Node.ComponentID == "area" {
+			if _, ok := c.Node.Callbacks["keyDown"]; !ok {
+				t.Error("keyDown callback not registered")
+			}
+			if _, ok := c.Node.Callbacks["keyUp"]; !ok {
+				t.Error("keyUp callback not registered")
+			}
+			return
+		}
+	}
+	t.Fatal("area not found in created views")
+}
