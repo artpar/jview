@@ -75,6 +75,13 @@ The `<app-path>` can be a directory containing JSONL files, or `owner/repo` to b
 | `--name` | Override the app name (default: from `canopy.json` or directory name) |
 | `--icon` | Path to an `.icns` file for the app icon |
 | `--bundle-id` | Override the macOS bundle identifier (default: `com.canopy.app.<name>`) |
+| `--sign` | Codesign with hardened runtime and entitlements |
+| `--identity` | Signing identity (default: auto-detect `Developer ID Application` from keychain) |
+| `--notarize` | Submit to Apple notarization and staple the ticket (implies `--sign`) |
+| `--apple-id` | Apple ID email for notarization |
+| `--team-id` | Team ID for notarization |
+| `--password` | App-specific password for notarization |
+| `--keychain-profile` | Stored keychain profile for notarization (alternative to apple-id/team-id/password) |
 
 **Examples:**
 
@@ -88,9 +95,20 @@ canopy bundle -o ~/Desktop/Notes.app sample_apps/notes
 # Bundle an installed package
 canopy bundle artpar/calculator
 
-# Bundle with custom icon and bundle ID
-canopy bundle --icon icon.icns --bundle-id com.example.myapp myapp/
+# Ad-hoc sign (no Apple Developer account needed, works locally)
+canopy bundle --sign --identity "-" myapp/
+
+# Sign with Developer ID (requires Apple Developer account)
+canopy bundle --sign myapp/
+
+# Sign and notarize for distribution (no Gatekeeper warnings)
+canopy bundle --sign --notarize --keychain-profile myprofile myapp/
+
+# Notarize with explicit credentials
+canopy bundle --sign --notarize --apple-id you@example.com --team-id ABC123 --password @keychain:AC_PASSWORD myapp/
 ```
+
+Notarization credentials can also be set via environment variables: `CANOPY_APPLE_ID`, `CANOPY_TEAM_ID`, `CANOPY_APP_PASSWORD`, or `CANOPY_KEYCHAIN_PROFILE`.
 
 The bundled binary auto-detects that it is inside a `.app` and launches as a normal dock application. Metadata (name, version, icon, bundle ID) is read from `canopy.json` if present, with flag overrides taking precedence.
 

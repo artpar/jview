@@ -35,10 +35,11 @@ Bundle any Canopy app into a standalone `.app`:
 ```bash
 canopy bundle myapp/                        # -> MyApp.app
 canopy bundle -o Notes.app sample_apps/notes  # custom output path
-canopy bundle --icon icon.icns myapp/       # with custom icon
+canopy bundle --sign --identity "-" myapp/  # ad-hoc sign (no Apple account)
+canopy bundle --sign --notarize myapp/      # sign + notarize for distribution
 ```
 
-The bundled `.app` is self-contained — double-click to launch, no CLI needed.
+The bundled `.app` is self-contained — double-click to launch, no CLI needed. Add `--sign` for codesigning with hardened runtime, and `--notarize` to submit to Apple for Gatekeeper-free distribution.
 
 ## Try it
 

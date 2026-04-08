@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -21,6 +23,13 @@ func RunBundle(args []string) {
 	name := fs.String("name", "", "Override app name (default: from canopy.json or directory name)")
 	icon := fs.String("icon", "", "Path to .icns file for the app icon")
 	bundleID := fs.String("bundle-id", "", "Override bundle identifier (default: com.canopy.app.<name>)")
+	sign := fs.Bool("sign", false, "Codesign the bundle with hardened runtime")
+	identity := fs.String("identity", "", "Signing identity (default: auto-detect Developer ID Application)")
+	notarize := fs.Bool("notarize", false, "Notarize the bundle with Apple (implies --sign)")
+	appleID := fs.String("apple-id", "", "Apple ID email for notarization")
+	teamID := fs.String("team-id", "", "Team ID for notarization")
+	password := fs.String("password", "", "App-specific password for notarization")
+	keychainProfile := fs.String("keychain-profile", "", "Keychain profile for notarization (alternative to apple-id/team-id/password)")
 	fs.StringVar(output, "o", "", "Output path for the .app bundle (short)")
 	fs.Parse(args)
 
@@ -126,6 +135,34 @@ func RunBundle(args []string) {
 	}
 
 	fmt.Printf("Built %s\n", outPath)
+
+	// Notarize implies sign
+	if *notarize {
+		*sign = true
+	}
+
+	// Codesign
+	if *sign {
+		fmt.Printf("Signing %s...\n", outPath)
+		if err := signBundle(outPath, *identity); err != nil {
+			fmt.Fprintf(os.Stderr, "error signing: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Notarize
+	if *notarize {
+		creds, err := resolveNotarizeCredentials(*appleID, *teamID, *password, *keychainProfile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Notarizing %s (this may take several minutes)...\n", outPath)
+		if err := notarizeBundle(outPath, creds); err != nil {
+			fmt.Fprintf(os.Stderr, "error notarizing: %v\n", err)
+			os.Exit(1)
+		}
+	}
 }
 
 // resolveAppPath resolves an app path argument. If it looks like owner/repo,
@@ -191,7 +228,6 @@ func resolveIconPath(iconField, appDir string) string {
 }
 
 func sanitizeID(name string) string {
-	// Replace non-alphanumeric with hyphens, lowercase
 	re := regexp.MustCompile(`[^a-zA-Z0-9]+`)
 	return strings.ToLower(re.ReplaceAllString(name, "-"))
 }
@@ -261,6 +297,194 @@ func writeInfoPlist(path string, m registry.Manifest, hasIcon bool) error {
 		Version:  m.Version,
 		HasIcon:  hasIcon,
 	})
+}
+
+// signBundle codesigns the .app with hardened runtime and embedded entitlements.
+func signBundle(appPath, identity string) error {
+	if _, err := exec.LookPath("codesign"); err != nil {
+		return fmt.Errorf("codesign not found; install Xcode Command Line Tools: xcode-select --install")
+	}
+
+	if identity == "" {
+		found, err := findSigningIdentity()
+		if err != nil {
+			return err
+		}
+		identity = found
+	}
+
+	// Write embedded entitlements to temp file
+	tmpFile, err := os.CreateTemp("", "canopy-entitlements-*.plist")
+	if err != nil {
+		return fmt.Errorf("create temp entitlements: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.Write(entitlementsData); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("write temp entitlements: %w", err)
+	}
+	tmpFile.Close()
+
+	// Sign with hardened runtime
+	cmd := exec.Command("codesign",
+		"--sign", identity,
+		"--options", "runtime",
+		"--entitlements", tmpFile.Name(),
+		"--timestamp",
+		"--force",
+		"--deep",
+		appPath,
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("codesign failed: %s\n%s", err, out)
+	}
+
+	// Verify
+	cmd = exec.Command("codesign", "--verify", "--verbose=2", appPath)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("codesign verification failed: %s\n%s", err, out)
+	}
+
+	fmt.Printf("Signed with: %s\n", identity)
+	return nil
+}
+
+// findSigningIdentity searches the keychain for a Developer ID Application identity.
+func findSigningIdentity() (string, error) {
+	cmd := exec.Command("security", "find-identity", "-v", "-p", "codesigning")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to list signing identities: %w", err)
+	}
+
+	for _, line := range strings.Split(string(out), "\n") {
+		// Lines look like: 1) ABC123 "Developer ID Application: Name (TEAMID)"
+		idx := strings.Index(line, `"Developer ID Application:`)
+		if idx < 0 {
+			continue
+		}
+		end := strings.LastIndex(line, `"`)
+		if end > idx {
+			return line[idx+1 : end], nil
+		}
+	}
+
+	return "", fmt.Errorf("no Developer ID Application identity found in keychain; specify --identity or install a signing certificate")
+}
+
+type notarizeCredentials struct {
+	keychainProfile string
+	appleID         string
+	teamID          string
+	password        string
+}
+
+func resolveNotarizeCredentials(flagAppleID, flagTeamID, flagPassword, flagProfile string) (notarizeCredentials, error) {
+	// Keychain profile takes priority
+	profile := flagProfile
+	if profile == "" {
+		profile = os.Getenv("CANOPY_KEYCHAIN_PROFILE")
+	}
+	if profile != "" {
+		return notarizeCredentials{keychainProfile: profile}, nil
+	}
+
+	// Collect individual credentials from flags then env
+	appleID := flagAppleID
+	if appleID == "" {
+		appleID = os.Getenv("CANOPY_APPLE_ID")
+	}
+	teamID := flagTeamID
+	if teamID == "" {
+		teamID = os.Getenv("CANOPY_TEAM_ID")
+	}
+	pwd := flagPassword
+	if pwd == "" {
+		pwd = os.Getenv("CANOPY_APP_PASSWORD")
+	}
+
+	var missing []string
+	if appleID == "" {
+		missing = append(missing, "apple-id (or CANOPY_APPLE_ID)")
+	}
+	if teamID == "" {
+		missing = append(missing, "team-id (or CANOPY_TEAM_ID)")
+	}
+	if pwd == "" {
+		missing = append(missing, "password (or CANOPY_APP_PASSWORD)")
+	}
+	if len(missing) > 0 {
+		return notarizeCredentials{}, fmt.Errorf("notarization requires credentials; missing: %s\n  use --keychain-profile as an alternative", strings.Join(missing, ", "))
+	}
+
+	return notarizeCredentials{appleID: appleID, teamID: teamID, password: pwd}, nil
+}
+
+// notarizeBundle submits the .app for Apple notarization and staples the ticket.
+func notarizeBundle(appPath string, creds notarizeCredentials) error {
+	if _, err := exec.LookPath("xcrun"); err != nil {
+		return fmt.Errorf("xcrun not found; install Xcode Command Line Tools: xcode-select --install")
+	}
+	if _, err := exec.LookPath("ditto"); err != nil {
+		return fmt.Errorf("ditto not found; install Xcode Command Line Tools: xcode-select --install")
+	}
+
+	// Create temp zip
+	tmpDir, err := os.MkdirTemp("", "canopy-notarize-*")
+	if err != nil {
+		return fmt.Errorf("create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	zipPath := filepath.Join(tmpDir, "bundle.zip")
+	cmd := exec.Command("ditto", "-c", "-k", "--keepParent", appPath, zipPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("ditto failed: %s\n%s", err, out)
+	}
+
+	// Submit for notarization
+	submitArgs := []string{"notarytool", "submit", zipPath, "--wait"}
+	if creds.keychainProfile != "" {
+		submitArgs = append(submitArgs, "--keychain-profile", creds.keychainProfile)
+	} else {
+		submitArgs = append(submitArgs, "--apple-id", creds.appleID, "--team-id", creds.teamID, "--password", creds.password)
+	}
+
+	cmd = exec.Command("xcrun", submitArgs...)
+	cmd.Stdout = os.Stderr // stream progress to stderr
+	cmd.Stderr = os.Stderr
+	var outBuf bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stderr, &outBuf)
+
+	if err := cmd.Run(); err != nil {
+		output := outBuf.String()
+		// Try to extract submission ID for user to check logs
+		if id := extractSubmissionID(output); id != "" {
+			return fmt.Errorf("notarization failed: %w\n  check details: xcrun notarytool log %s", err, id)
+		}
+		return fmt.Errorf("notarization failed: %w\n%s", err, output)
+	}
+
+	// Staple the ticket
+	cmd = exec.Command("xcrun", "stapler", "staple", appPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("stapler failed: %s\n%s", err, out)
+	}
+
+	fmt.Printf("Notarized and stapled: %s\n", appPath)
+	return nil
+}
+
+// extractSubmissionID tries to find a submission UUID in notarytool output.
+func extractSubmissionID(output string) string {
+	re := regexp.MustCompile(`id:\s*([0-9a-f-]{36})`)
+	m := re.FindStringSubmatch(output)
+	if len(m) > 1 {
+		return m[1]
+	}
+	return ""
 }
 
 const infoPlistTmpl = `<?xml version="1.0" encoding="UTF-8"?>
