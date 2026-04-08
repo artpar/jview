@@ -498,6 +498,11 @@ func main() {
 	cm = engine.NewChannelManager(sess)
 	sess.SetChannelManager(cm)
 
+	// Wire window events from native delegate → EventManager
+	darwin.SetWindowEventHandler(func(surfaceID, event, data string) {
+		sess.EventManager().Fire(event, surfaceID, data)
+	})
+
 	// Wire status bar menu handlers
 	darwin.OnStatusMenuAppClicked = func(appPath string) {
 		jlog.Infof("main", "", "launching app: %s", appPath)
@@ -919,6 +924,11 @@ func runMCP(args []string) {
 	cm := engine.NewChannelManager(sess)
 	sess.SetChannelManager(cm)
 
+	// Wire window events from native delegate → EventManager
+	darwin.SetWindowEventHandler(func(surfaceID, event, data string) {
+		sess.EventManager().Fire(event, surfaceID, data)
+	})
+
 	// If a file arg is provided, load it as initial UI
 	if len(args) > 0 {
 		tr := createFileTransport(args[0])
@@ -1048,46 +1058,52 @@ func scanSampleApps() []darwin.StatusMenuApp {
 		}
 	}
 
-	// Also scan installed packages from ~/.canopy/apps/
+	// Also scan installed packages from ~/.canopy/apps/{host}/{owner}/{repo}/
 	home, err := os.UserHomeDir()
 	if err == nil {
 		appsDir := filepath.Join(home, ".canopy", "apps")
-		owners, _ := os.ReadDir(appsDir)
-		for _, owner := range owners {
-			if !owner.IsDir() {
+		hosts, _ := os.ReadDir(appsDir)
+		for _, host := range hosts {
+			if !host.IsDir() {
 				continue
 			}
-			pkgs, _ := os.ReadDir(filepath.Join(appsDir, owner.Name()))
-			for _, pkg := range pkgs {
-				if !pkg.IsDir() {
+			owners, _ := os.ReadDir(filepath.Join(appsDir, host.Name()))
+			for _, owner := range owners {
+				if !owner.IsDir() {
 					continue
 				}
-				pkgPath := filepath.Join(appsDir, owner.Name(), pkg.Name())
-				label := titleCase(pkg.Name())
-				icon := "app"
+				pkgs, _ := os.ReadDir(filepath.Join(appsDir, host.Name(), owner.Name()))
+				for _, pkg := range pkgs {
+					if !pkg.IsDir() {
+						continue
+					}
+					pkgPath := filepath.Join(appsDir, host.Name(), owner.Name(), pkg.Name())
+					label := titleCase(pkg.Name())
+					icon := "app"
 
-				// Try to read canopy.json for better metadata
-				manifestData, err := os.ReadFile(filepath.Join(pkgPath, "canopy.json"))
-				if err == nil {
-					var m struct {
-						Name string `json:"name"`
-						Icon string `json:"icon"`
-					}
-					if json.Unmarshal(manifestData, &m) == nil {
-						if m.Name != "" {
-							label = m.Name
+					// Try to read canopy.json for better metadata
+					manifestData, err := os.ReadFile(filepath.Join(pkgPath, "canopy.json"))
+					if err == nil {
+						var m struct {
+							Name string `json:"name"`
+							Icon string `json:"icon"`
 						}
-						if m.Icon != "" {
-							icon = m.Icon
+						if json.Unmarshal(manifestData, &m) == nil {
+							if m.Name != "" {
+								label = m.Name
+							}
+							if m.Icon != "" {
+								icon = m.Icon
+							}
 						}
 					}
+
+					apps = append(apps, darwin.StatusMenuApp{
+						Label: label,
+						Path:  pkgPath,
+						Icon:  icon,
+					})
 				}
-
-				apps = append(apps, darwin.StatusMenuApp{
-					Label: label,
-					Path:  pkgPath,
-					Icon:  icon,
-				})
 			}
 		}
 	}

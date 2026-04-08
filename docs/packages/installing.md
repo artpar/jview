@@ -26,7 +26,7 @@ canopy pkg search notes --type=app
 Before installing, you can inspect a package:
 
 ```bash
-canopy pkg info artpar/notes
+canopy pkg info github.com/artpar/notes
 ```
 
 This shows the manifest, available versions, description, and dependencies.
@@ -36,20 +36,20 @@ This shows the manifest, available versions, description, and dependencies.
 Install the latest version:
 
 ```bash
-canopy pkg install artpar/calculator
+canopy pkg install github.com/artpar/calculator
 ```
 
 Install a specific version:
 
 ```bash
-canopy pkg install artpar/calculator @1.0.0
+canopy pkg install github.com/artpar/calculator @1.0.0
 ```
 
 The package is downloaded from the GitHub Release and placed in the appropriate directory based on its type:
 
 | Type | Location |
 |------|----------|
-| app | `~/.canopy/apps/{owner}/{name}/` |
+| app | `~/.canopy/apps/github.com/{owner}/{name}/` |
 | component | `~/.canopy/library/{name}.jsonl` |
 | theme | `~/.canopy/themes/{name}.jsonl` |
 | ffi-config | `~/.canopy/ffi/{name}.json` |
@@ -81,7 +81,7 @@ canopy pkg update
 Update a specific package:
 
 ```bash
-canopy pkg update artpar/notes
+canopy pkg update github.com/artpar/notes
 ```
 
 ## Uninstalling
@@ -89,7 +89,9 @@ canopy pkg update artpar/notes
 Remove a package:
 
 ```bash
-canopy pkg uninstall artpar/calculator
+canopy pkg uninstall github.com/artpar/calculator
 ```
 
 This removes the package files from the install directory.
+
+> **Note:** Bare `owner/repo` is accepted as shorthand for `github.com/owner/repo`.

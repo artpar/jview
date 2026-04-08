@@ -37,7 +37,7 @@ func RunBundle(args []string) {
 		fmt.Fprintf(os.Stderr, "Usage: canopy bundle <app-path> [flags]\n\n")
 		fmt.Fprintf(os.Stderr, "Create a standalone macOS .app bundle from a Canopy app.\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
-		fmt.Fprintf(os.Stderr, "  <app-path>    App directory, or owner/repo for an installed package\n\n")
+		fmt.Fprintf(os.Stderr, "  <app-path>    App directory, or github.com/owner/repo for an installed package\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		fs.PrintDefaults()
 		os.Exit(1)
@@ -165,22 +165,22 @@ func RunBundle(args []string) {
 	}
 }
 
-// resolveAppPath resolves an app path argument. If it looks like owner/repo,
-// check the installed packages directory.
+// resolveAppPath resolves an app path argument. If it looks like a package
+// reference (github.com/owner/repo or owner/repo), check installed packages.
 func resolveAppPath(arg string) string {
-	// Check if it looks like owner/repo (exactly one slash, no path separators)
-	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$`, arg); matched {
-		// Try installed package
+	ref, err := registry.ParsePackageRef(arg)
+	if err == nil {
+		// Try installed package by namespaced key
 		reg, err := registry.New()
 		if err == nil {
-			if entry := reg.Get(arg); entry != nil && entry.Path != "" {
+			if entry := reg.Get(ref.String()); entry != nil && entry.Path != "" {
 				return entry.Path
 			}
 		}
 		// Try direct path under ~/.canopy/apps/
 		home, err := os.UserHomeDir()
 		if err == nil {
-			pkgPath := filepath.Join(home, ".canopy", "apps", arg)
+			pkgPath := filepath.Join(home, ".canopy", "apps", ref.Host, ref.Owner, ref.Repo)
 			if info, err := os.Stat(pkgPath); err == nil && info.IsDir() {
 				return pkgPath
 			}

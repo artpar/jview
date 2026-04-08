@@ -17,7 +17,9 @@ import (
 
 // Install downloads and installs a package from GitHub.
 // If version is empty, the latest semver tag is used.
-func Install(reg *Registry, client *github.Client, ownerRepo string, version string) (*PackageEntry, error) {
+func Install(reg *Registry, client *github.Client, ref PackageRef, version string) (*PackageEntry, error) {
+	ownerRepo := ref.OwnerRepo()
+
 	// Resolve version to a tag
 	tags, err := client.ListTags(ownerRepo)
 	if err != nil {
@@ -34,9 +36,9 @@ func Install(reg *Registry, client *github.Client, ownerRepo string, version str
 	tag, _, _ := FindBestTag(tagNames, version)
 	if tag == "" {
 		if version != "" {
-			return nil, fmt.Errorf("no tag matching %q in %s", version, ownerRepo)
+			return nil, fmt.Errorf("no tag matching %q in %s", version, ref)
 		}
-		return nil, fmt.Errorf("no semver tags found in %s", ownerRepo)
+		return nil, fmt.Errorf("no semver tags found in %s", ref)
 	}
 	commit := tagCommits[tag]
 
@@ -53,7 +55,7 @@ func Install(reg *Registry, client *github.Client, ownerRepo string, version str
 	}
 
 	// Determine install path by type
-	installDir, err := installPathForType(manifest, ownerRepo)
+	installDir, err := installPathForRef(manifest, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -91,10 +93,11 @@ func Install(reg *Registry, client *github.Client, ownerRepo string, version str
 	}
 
 	parsedVer, _ := ParseSemver(tag)
+	key := ref.String()
 	entry := &PackageEntry{
 		Name:        manifest.Name,
 		Type:        manifest.Type,
-		Repo:        ownerRepo,
+		Repo:        key,
 		Version:     parsedVer.String(),
 		Commit:      commit,
 		InstalledAt: time.Now().UTC(),
@@ -103,7 +106,6 @@ func Install(reg *Registry, client *github.Client, ownerRepo string, version str
 		Entry:       manifest.Entry,
 	}
 
-	key := ownerRepo
 	if err := reg.Put(key, entry); err != nil {
 		return entry, fmt.Errorf("registry update: %w", err)
 	}
@@ -156,7 +158,11 @@ func CheckUpdates(reg *Registry, client *github.Client, name string) ([]UpdateIn
 			continue
 		}
 
-		tags, err := client.ListTags(entry.Repo)
+		entryRef, err := ParsePackageRef(entry.Repo)
+		if err != nil {
+			continue
+		}
+		tags, err := client.ListTags(entryRef.OwnerRepo())
 		if err != nil {
 			continue
 		}
@@ -200,7 +206,11 @@ func Update(reg *Registry, client *github.Client, name string) ([]UpdateInfo, er
 
 	var applied []UpdateInfo
 	for _, u := range updates {
-		_, err := Install(reg, client, u.Repo, "")
+		ref, err := ParsePackageRef(u.Repo)
+		if err != nil {
+			continue
+		}
+		_, err = Install(reg, client, ref, "")
 		if err != nil {
 			continue
 		}
@@ -209,38 +219,15 @@ func Update(reg *Registry, client *github.Client, name string) ([]UpdateInfo, er
 	return applied, nil
 }
 
-func installPathForType(m *Manifest, ownerRepo string) (string, error) {
-	parts := strings.SplitN(ownerRepo, "/", 2)
-	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid repo format: %q", ownerRepo)
+func installPathForRef(m *Manifest, ref PackageRef) (string, error) {
+	appsDir, err := AppsDir()
+	if err != nil {
+		return "", err
 	}
-	owner, name := parts[0], parts[1]
 
 	switch m.Type {
-	case TypeApp:
-		appsDir, err := AppsDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(appsDir, owner, name), nil
-	case TypeComponent:
-		appsDir, err := AppsDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(appsDir, owner, name), nil
-	case TypeTheme:
-		appsDir, err := AppsDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(appsDir, owner, name), nil
-	case TypeFFIConfig:
-		appsDir, err := AppsDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(appsDir, owner, name), nil
+	case TypeApp, TypeComponent, TypeTheme, TypeFFIConfig:
+		return filepath.Join(appsDir, ref.Host, ref.Owner, ref.Repo), nil
 	default:
 		return "", fmt.Errorf("unknown package type: %q", m.Type)
 	}

@@ -50,16 +50,19 @@ func printPkgUsage() {
 	fmt.Println(`Usage: canopy pkg <command> [args]
 
 Commands:
-  login                         Authenticate with GitHub
-  search <query> [--type=TYPE]  Search for Canopy packages
-  info <owner/repo>             Show package details
-  install <owner/repo> [@ver]   Install a package
-  uninstall <owner/name>        Uninstall a package
-  update [<owner/name>]         Update packages
-  list [--type=TYPE]            List installed packages
-  publish [path] [--repo=O/R]   Publish to GitHub
+  login                                    Authenticate with GitHub
+  search <query> [--type=TYPE]             Search for Canopy packages
+  info <github.com/owner/repo>             Show package details
+  install <github.com/owner/repo> [@ver]   Install a package
+  uninstall <github.com/owner/repo>        Uninstall a package
+  update [<github.com/owner/repo>]         Update packages
+  list [--type=TYPE]                       List installed packages
+  publish [path] [--repo=owner/repo]       Publish to GitHub
 
-Types: app, component, theme, ffi-config`)
+Types: app, component, theme, ffi-config
+
+Package references use Go-style namespacing: github.com/owner/repo
+Bare owner/repo is accepted as shorthand for github.com/owner/repo`)
 }
 
 func cmdLogin() {
@@ -110,7 +113,7 @@ func cmdSearch(args []string) {
 		if repo.Stars > 0 {
 			stars = fmt.Sprintf(" (%d stars)", repo.Stars)
 		}
-		fmt.Printf("  %s%s\n", repo.FullName, stars)
+		fmt.Printf("  github.com/%s%s\n", repo.FullName, stars)
 		if repo.Description != "" {
 			fmt.Printf("    %s\n", repo.Description)
 		}
@@ -119,11 +122,17 @@ func cmdSearch(args []string) {
 
 func cmdInfo(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: canopy pkg info <owner/repo>")
+		fmt.Fprintln(os.Stderr, "usage: canopy pkg info <github.com/owner/repo>")
 		os.Exit(1)
 	}
 
-	ownerRepo := args[0]
+	ref, err := registry.ParsePackageRef(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	ownerRepo := ref.OwnerRepo()
 	client, err := github.NewClientFromStored()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -143,7 +152,7 @@ func cmdInfo(args []string) {
 		fmt.Fprintf(os.Stderr, "warning: no canopy.json found\n")
 	}
 
-	fmt.Printf("Repository: %s\n", repo.FullName)
+	fmt.Printf("Package: %s\n", ref)
 	fmt.Printf("Description: %s\n", repo.Description)
 	fmt.Printf("Stars: %d\n", repo.Stars)
 	fmt.Printf("URL: %s\n", repo.HTMLURL)
@@ -151,7 +160,7 @@ func cmdInfo(args []string) {
 	if manifestData != nil {
 		var m registry.Manifest
 		if json.Unmarshal(manifestData, &m) == nil {
-			fmt.Printf("\nPackage:\n")
+			fmt.Printf("\nManifest:\n")
 			fmt.Printf("  Name: %s\n", m.Name)
 			fmt.Printf("  Version: %s\n", m.Version)
 			fmt.Printf("  Type: %s\n", m.Type)
@@ -184,11 +193,16 @@ func cmdInfo(args []string) {
 
 func cmdInstall(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: canopy pkg install <owner/repo> [@version]")
+		fmt.Fprintln(os.Stderr, "usage: canopy pkg install <github.com/owner/repo> [@version]")
 		os.Exit(1)
 	}
 
-	ownerRepo := args[0]
+	ref, err := registry.ParsePackageRef(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
 	version := ""
 	if len(args) > 1 {
 		version = strings.TrimPrefix(args[1], "@")
@@ -206,8 +220,8 @@ func cmdInstall(args []string) {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Installing %s...\n", ownerRepo)
-	entry, err := registry.Install(reg, client, ownerRepo, version)
+	fmt.Printf("Installing %s...\n", ref)
+	entry, err := registry.Install(reg, client, ref, version)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "install failed: %v\n", err)
 		os.Exit(1)
@@ -218,7 +232,13 @@ func cmdInstall(args []string) {
 
 func cmdUninstall(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: canopy pkg uninstall <owner/name>")
+		fmt.Fprintln(os.Stderr, "usage: canopy pkg uninstall <github.com/owner/repo>")
+		os.Exit(1)
+	}
+
+	ref, err := registry.ParsePackageRef(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -228,19 +248,24 @@ func cmdUninstall(args []string) {
 		os.Exit(1)
 	}
 
-	key := args[0]
+	key := ref.String()
 	if err := registry.Uninstall(reg, key); err != nil {
 		fmt.Fprintf(os.Stderr, "uninstall failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Uninstalled %s\n", key)
+	fmt.Printf("Uninstalled %s\n", ref)
 }
 
 func cmdUpdate(args []string) {
 	name := ""
 	if len(args) > 0 {
-		name = args[0]
+		ref, err := registry.ParsePackageRef(args[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		name = ref.String()
 	}
 
 	client, err := github.NewClientFromStored()
@@ -306,17 +331,28 @@ func cmdList(args []string) {
 
 func cmdPublish(args []string) {
 	path := "."
-	ownerRepo := ""
+	repoArg := ""
 	tag := ""
 
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "--repo=") {
-			ownerRepo = strings.TrimPrefix(arg, "--repo=")
+			repoArg = strings.TrimPrefix(arg, "--repo=")
 		} else if strings.HasPrefix(arg, "--tag=") {
 			tag = strings.TrimPrefix(arg, "--tag=")
 		} else if !strings.HasPrefix(arg, "-") {
 			path = arg
 		}
+	}
+
+	if repoArg == "" {
+		fmt.Fprintln(os.Stderr, "usage: canopy pkg publish [path] --repo=owner/repo")
+		os.Exit(1)
+	}
+
+	ref, err := registry.ParsePackageRef(repoArg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
 	}
 
 	client, err := github.NewClientFromStored()
@@ -330,13 +366,8 @@ func cmdPublish(args []string) {
 		os.Exit(1)
 	}
 
-	if ownerRepo == "" {
-		fmt.Fprintln(os.Stderr, "usage: canopy pkg publish [path] --repo=owner/repo")
-		os.Exit(1)
-	}
-
-	fmt.Printf("Publishing %s to %s...\n", path, ownerRepo)
-	result, err := registry.Publish(client, path, ownerRepo, tag)
+	fmt.Printf("Publishing %s to %s...\n", path, ref)
+	result, err := registry.Publish(client, path, ref, tag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "publish failed: %v\n", err)
 		os.Exit(1)

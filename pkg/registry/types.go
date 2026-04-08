@@ -1,6 +1,51 @@
 package registry
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+const DefaultHost = "github.com"
+
+// PackageRef is a namespaced package reference like "github.com/owner/repo".
+type PackageRef struct {
+	Host  string // e.g. "github.com"
+	Owner string // e.g. "artpar"
+	Repo  string // e.g. "calculator"
+}
+
+// ParsePackageRef parses a package reference string.
+// Accepts "github.com/owner/repo" (full) or "owner/repo" (assumes github.com).
+func ParsePackageRef(s string) (PackageRef, error) {
+	parts := strings.Split(s, "/")
+	switch len(parts) {
+	case 3:
+		// github.com/owner/repo
+		if parts[0] == "" || parts[1] == "" || parts[2] == "" {
+			return PackageRef{}, fmt.Errorf("invalid package reference: %q", s)
+		}
+		return PackageRef{Host: parts[0], Owner: parts[1], Repo: parts[2]}, nil
+	case 2:
+		// owner/repo → assume github.com
+		if parts[0] == "" || parts[1] == "" {
+			return PackageRef{}, fmt.Errorf("invalid package reference: %q", s)
+		}
+		return PackageRef{Host: DefaultHost, Owner: parts[0], Repo: parts[1]}, nil
+	default:
+		return PackageRef{}, fmt.Errorf("invalid package reference: %q (expected github.com/owner/repo)", s)
+	}
+}
+
+// String returns the full namespaced reference: "github.com/owner/repo".
+func (r PackageRef) String() string {
+	return r.Host + "/" + r.Owner + "/" + r.Repo
+}
+
+// OwnerRepo returns "owner/repo" for GitHub API calls.
+func (r PackageRef) OwnerRepo() string {
+	return r.Owner + "/" + r.Repo
+}
 
 // PackageType is the kind of Canopy package.
 type PackageType string

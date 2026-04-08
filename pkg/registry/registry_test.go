@@ -82,7 +82,7 @@ func TestRegistryPersistence(t *testing.T) {
 
 	// Create and populate
 	reg, _ := NewAt(dir)
-	reg.Put("owner/pkg", &PackageEntry{
+	reg.Put("github.com/owner/pkg", &PackageEntry{
 		Name:    "pkg",
 		Type:    TypeApp,
 		Version: "2.0.0",
@@ -90,7 +90,7 @@ func TestRegistryPersistence(t *testing.T) {
 
 	// Reload from disk
 	reg2, _ := NewAt(dir)
-	got := reg2.Get("owner/pkg")
+	got := reg2.Get("github.com/owner/pkg")
 	if got == nil {
 		t.Fatal("expected entry after reload")
 	}

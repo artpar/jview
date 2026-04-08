@@ -23,10 +23,12 @@ type PublishResult struct {
 // 2. Creates a git tag if it doesn't exist
 // 3. Creates a GitHub release
 // 4. Sets the canopy-package topic
-func Publish(client *github.Client, localPath string, ownerRepo string, tagOverride string) (*PublishResult, error) {
+func Publish(client *github.Client, localPath string, ref PackageRef, tagOverride string) (*PublishResult, error) {
 	if !client.IsAuthenticated() {
 		return nil, fmt.Errorf("not authenticated; run 'canopy pkg login' first")
 	}
+
+	ownerRepo := ref.OwnerRepo()
 
 	// Read and validate canopy.json
 	manifestPath := filepath.Join(localPath, "canopy.json")
@@ -49,11 +51,6 @@ func Publish(client *github.Client, localPath string, ownerRepo string, tagOverr
 	}
 	if !strings.HasPrefix(tag, "v") {
 		tag = "v" + tag
-	}
-
-	// Infer repo from manifest if not provided
-	if ownerRepo == "" {
-		return nil, fmt.Errorf("repo is required for publish")
 	}
 
 	// Get HEAD SHA for tagging
@@ -85,7 +82,7 @@ func Publish(client *github.Client, localPath string, ownerRepo string, tagOverr
 	_ = client.SetTopics(ownerRepo, topics)
 
 	return &PublishResult{
-		Repo:       ownerRepo,
+		Repo:       ref.String(),
 		Tag:        tag,
 		ReleaseURL: release.HTMLURL,
 	}, nil

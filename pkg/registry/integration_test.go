@@ -11,6 +11,11 @@ import (
 	"canopy/pkg/github"
 )
 
+func ref(s string) PackageRef {
+	r, _ := ParsePackageRef(s)
+	return r
+}
+
 func setupTestServer(t *testing.T, manifest *Manifest, tarFiles map[string]string) (*github.Client, *httptest.Server) {
 	t.Helper()
 
@@ -77,7 +82,7 @@ func TestInstallApp(t *testing.T) {
 	regDir := t.TempDir()
 	reg, _ := NewAt(regDir)
 
-	entry, err := Install(reg, client, "owner/test-app", "")
+	entry, err := Install(reg, client, ref("owner/test-app"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +103,7 @@ func TestInstallApp(t *testing.T) {
 	}
 
 	// Verify registry updated
-	got := reg.Get("owner/test-app")
+	got := reg.Get("github.com/owner/test-app")
 	if got == nil {
 		t.Fatal("not in registry")
 	}
@@ -144,7 +149,7 @@ func TestInstallWithVersion(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	entry, err := Install(reg, client, "owner/test-app", "1.0.0")
+	entry, err := Install(reg, client, ref("owner/test-app"), "1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +167,7 @@ func TestInstallNoTags(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	_, err := Install(reg, client, "owner/test-app", "")
+	_, err := Install(reg, client, ref("owner/test-app"), "")
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -179,7 +184,7 @@ func TestInstallNoMatchingVersion(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	_, err := Install(reg, client, "owner/test-app", ">=2.0.0")
+	_, err := Install(reg, client, ref("owner/test-app"), ">=2.0.0")
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -217,7 +222,7 @@ func TestInstallComponent(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	entry, err := Install(reg, client, "owner/comp", "")
+	entry, err := Install(reg, client, ref("owner/comp"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +263,7 @@ func TestInstallTheme(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	entry, err := Install(reg, client, "owner/theme", "")
+	entry, err := Install(reg, client, ref("owner/theme"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +304,7 @@ func TestInstallFFI(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	entry, err := Install(reg, client, "owner/ffi", "")
+	entry, err := Install(reg, client, ref("owner/ffi"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +326,7 @@ func TestCheckUpdates(t *testing.T) {
 
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
-	reg.Put("owner/pkg", &PackageEntry{
+	reg.Put("github.com/owner/pkg", &PackageEntry{
 		Name:    "pkg",
 		Type:    TypeApp,
 		Repo:    "owner/pkg",
@@ -350,7 +355,7 @@ func TestCheckUpdatesNoUpdate(t *testing.T) {
 
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
-	reg.Put("owner/pkg", &PackageEntry{
+	reg.Put("github.com/owner/pkg", &PackageEntry{
 		Version: "1.0.0",
 		Repo:    "owner/pkg",
 	})
@@ -369,10 +374,10 @@ func TestCheckUpdatesFilter(t *testing.T) {
 
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
-	reg.Put("owner/a", &PackageEntry{Version: "1.0.0", Repo: "owner/a"})
-	reg.Put("owner/b", &PackageEntry{Version: "1.0.0", Repo: "owner/b"})
+	reg.Put("github.com/owner/a", &PackageEntry{Version: "1.0.0", Repo: "github.com/owner/a"})
+	reg.Put("github.com/owner/b", &PackageEntry{Version: "1.0.0", Repo: "github.com/owner/b"})
 
-	updates, _ := CheckUpdates(reg, client, "owner/a")
+	updates, _ := CheckUpdates(reg, client, "github.com/owner/a")
 	if len(updates) != 1 {
 		t.Errorf("expected 1, got %d", len(updates))
 	}
@@ -410,10 +415,10 @@ func TestUpdate(t *testing.T) {
 
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
-	reg.Put("owner/pkg", &PackageEntry{
+	reg.Put("github.com/owner/pkg", &PackageEntry{
 		Name:    "pkg",
 		Type:    TypeApp,
-		Repo:    "owner/pkg",
+		Repo:    "github.com/owner/pkg",
 		Version: "1.0.0",
 	})
 
@@ -429,7 +434,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	// Registry should be updated
-	entry := reg.Get("owner/pkg")
+	entry := reg.Get("github.com/owner/pkg")
 	if entry == nil {
 		t.Fatal("entry missing")
 	}
@@ -446,7 +451,7 @@ func TestUpdateNoUpdates(t *testing.T) {
 
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
-	reg.Put("owner/pkg", &PackageEntry{Version: "1.0.0", Repo: "owner/pkg"})
+	reg.Put("github.com/owner/pkg", &PackageEntry{Version: "1.0.0", Repo: "github.com/owner/pkg"})
 
 	updated, err := Update(reg, client, "")
 	if err != nil {
@@ -466,7 +471,7 @@ func TestInstallTagListError(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	_, err := Install(reg, client, "owner/pkg", "")
+	_, err := Install(reg, client, ref("owner/pkg"), "")
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -490,7 +495,7 @@ func TestInstallDownloadError(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	_, err := Install(reg, client, "owner/pkg", "")
+	_, err := Install(reg, client, ref("owner/pkg"), "")
 	if err == nil {
 		t.Error("expected error for download failure")
 	}
@@ -514,7 +519,7 @@ func TestInstallBadTarball(t *testing.T) {
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
 
-	_, err := Install(reg, client, "owner/pkg", "")
+	_, err := Install(reg, client, ref("owner/pkg"), "")
 	if err == nil {
 		t.Error("expected error for bad tarball")
 	}
@@ -528,7 +533,7 @@ func TestCheckUpdatesTagError(t *testing.T) {
 
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
-	reg.Put("owner/pkg", &PackageEntry{Version: "1.0.0", Repo: "owner/pkg"})
+	reg.Put("github.com/owner/pkg", &PackageEntry{Version: "1.0.0", Repo: "github.com/owner/pkg"})
 
 	// Should not error, just skip the package
 	updates, err := CheckUpdates(reg, client, "")
@@ -548,7 +553,7 @@ func TestCheckUpdatesNoTags(t *testing.T) {
 
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
-	reg.Put("owner/pkg", &PackageEntry{Version: "1.0.0", Repo: "owner/pkg"})
+	reg.Put("github.com/owner/pkg", &PackageEntry{Version: "1.0.0", Repo: "github.com/owner/pkg"})
 
 	updates, _ := CheckUpdates(reg, client, "")
 	if len(updates) != 0 {
@@ -564,7 +569,7 @@ func TestCheckUpdatesBadVersion(t *testing.T) {
 
 	client := github.NewTestClient("", srv.URL)
 	reg, _ := NewAt(t.TempDir())
-	reg.Put("owner/pkg", &PackageEntry{Version: "bad", Repo: "owner/pkg"})
+	reg.Put("github.com/owner/pkg", &PackageEntry{Version: "bad", Repo: "github.com/owner/pkg"})
 
 	updates, _ := CheckUpdates(reg, client, "")
 	if len(updates) != 0 {
@@ -587,7 +592,7 @@ func TestPublish(t *testing.T) {
 	manifestJSON, _ := json.Marshal(manifest)
 	os.WriteFile(filepath.Join(dir, "canopy.json"), manifestJSON, 0644)
 
-	result, err := Publish(client, dir, "owner/test-app", "")
+	result, err := Publish(client, dir, ref("owner/test-app"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,7 +618,7 @@ func TestPublishWithTagOverride(t *testing.T) {
 	manifestJSON, _ := json.Marshal(manifest)
 	os.WriteFile(filepath.Join(dir, "canopy.json"), manifestJSON, 0644)
 
-	result, err := Publish(client, dir, "owner/test-app", "2.0.0")
+	result, err := Publish(client, dir, ref("owner/test-app"), "2.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -636,7 +641,7 @@ func TestPublishWithVPrefix(t *testing.T) {
 	manifestJSON, _ := json.Marshal(manifest)
 	os.WriteFile(filepath.Join(dir, "canopy.json"), manifestJSON, 0644)
 
-	result, err := Publish(client, dir, "owner/test-app", "v3.0.0")
+	result, err := Publish(client, dir, ref("owner/test-app"), "v3.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,7 +652,7 @@ func TestPublishWithVPrefix(t *testing.T) {
 
 func TestPublishNoAuth(t *testing.T) {
 	client := github.NewTestClient("", "http://localhost")
-	_, err := Publish(client, ".", "owner/repo", "")
+	_, err := Publish(client, ".", ref("owner/repo"), "")
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -666,7 +671,7 @@ func TestPublishNoRepo(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "canopy.json"), manifestJSON, 0644)
 
 	client := github.NewTestClient("tok", "http://localhost")
-	_, err := Publish(client, dir, "", "")
+	_, err := Publish(client, dir, ref("invalid"), "")
 	if err == nil {
 		t.Error("expected error for empty repo")
 	}
@@ -674,7 +679,7 @@ func TestPublishNoRepo(t *testing.T) {
 
 func TestPublishNoManifest(t *testing.T) {
 	client := github.NewTestClient("tok", "http://localhost")
-	_, err := Publish(client, t.TempDir(), "owner/repo", "")
+	_, err := Publish(client, t.TempDir(), ref("owner/repo"), "")
 	if err == nil {
 		t.Error("expected error for missing canopy.json")
 	}
@@ -685,7 +690,7 @@ func TestPublishInvalidManifest(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "canopy.json"), []byte("not json"), 0644)
 
 	client := github.NewTestClient("tok", "http://localhost")
-	_, err := Publish(client, dir, "owner/repo", "")
+	_, err := Publish(client, dir, ref("owner/repo"), "")
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -697,7 +702,7 @@ func TestPublishBadManifest(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "canopy.json"), m, 0644)
 
 	client := github.NewTestClient("tok", "http://localhost")
-	_, err := Publish(client, dir, "owner/repo", "")
+	_, err := Publish(client, dir, ref("owner/repo"), "")
 	if err == nil {
 		t.Error("expected error for invalid manifest")
 	}
@@ -717,7 +722,7 @@ func TestPublishNoDescription(t *testing.T) {
 	manifestJSON, _ := json.Marshal(manifest)
 	os.WriteFile(filepath.Join(dir, "canopy.json"), manifestJSON, 0644)
 
-	result, err := Publish(client, dir, "owner/test-app", "")
+	result, err := Publish(client, dir, ref("owner/test-app"), "")
 	if err != nil {
 		t.Fatal(err)
 	}

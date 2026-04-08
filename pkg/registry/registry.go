@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -44,6 +45,28 @@ func (r *Registry) load() {
 	var rf RegistryFile
 	if json.Unmarshal(data, &rf) == nil && rf.Packages != nil {
 		r.data = rf
+		r.migrateKeys()
+	}
+}
+
+// migrateKeys upgrades bare "owner/repo" keys to "github.com/owner/repo".
+func (r *Registry) migrateKeys() {
+	migrated := false
+	for key, entry := range r.data.Packages {
+		// Old keys have exactly one slash and no dots before the slash
+		parts := strings.SplitN(key, "/", 2)
+		if len(parts) == 2 && !strings.Contains(parts[0], ".") {
+			newKey := DefaultHost + "/" + key
+			r.data.Packages[newKey] = entry
+			if entry.Repo == key {
+				entry.Repo = newKey
+			}
+			delete(r.data.Packages, key)
+			migrated = true
+		}
+	}
+	if migrated {
+		r.save()
 	}
 }
 
@@ -55,7 +78,7 @@ func (r *Registry) save() error {
 	return os.WriteFile(r.path, data, 0644)
 }
 
-// Get returns an installed package entry by key (owner/name). Nil if not found.
+// Get returns an installed package entry by key (github.com/owner/repo). Nil if not found.
 func (r *Registry) Get(key string) *PackageEntry {
 	r.mu.Lock()
 	defer r.mu.Unlock()

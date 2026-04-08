@@ -185,24 +185,23 @@ func TestCopyFileMissing(t *testing.T) {
 	}
 }
 
-func TestInstallPathForType(t *testing.T) {
+func TestInstallPathForRef(t *testing.T) {
 	tests := []struct {
 		typ     PackageType
-		repo    string
+		ref     PackageRef
 		wantErr bool
 	}{
-		{TypeApp, "owner/repo", false},
-		{TypeComponent, "owner/comp", false},
-		{TypeTheme, "owner/theme", false},
-		{TypeFFIConfig, "owner/ffi", false},
-		{PackageType("unknown"), "owner/repo", true},
-		{TypeApp, "noslash", true},
+		{TypeApp, PackageRef{DefaultHost, "owner", "repo"}, false},
+		{TypeComponent, PackageRef{DefaultHost, "owner", "comp"}, false},
+		{TypeTheme, PackageRef{DefaultHost, "owner", "theme"}, false},
+		{TypeFFIConfig, PackageRef{DefaultHost, "owner", "ffi"}, false},
+		{PackageType("unknown"), PackageRef{DefaultHost, "owner", "repo"}, true},
 	}
 	for _, tt := range tests {
 		m := &Manifest{Type: tt.typ}
-		_, err := installPathForType(m, tt.repo)
+		_, err := installPathForRef(m, tt.ref)
 		if (err != nil) != tt.wantErr {
-			t.Errorf("installPathForType(%s, %q) error = %v, wantErr %v", tt.typ, tt.repo, err, tt.wantErr)
+			t.Errorf("installPathForRef(%s, %q) error = %v, wantErr %v", tt.typ, tt.ref, err, tt.wantErr)
 		}
 	}
 }

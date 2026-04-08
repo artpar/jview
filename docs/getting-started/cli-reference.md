@@ -50,10 +50,10 @@ Manage reusable components shared through GitHub:
 |:--------|:------------|
 | `canopy pkg login` | Authenticate with GitHub |
 | `canopy pkg search <query>` | Search for packages |
-| `canopy pkg info <owner/repo>` | Show package details |
-| `canopy pkg install <owner/repo> [@version]` | Install a package |
-| `canopy pkg uninstall <owner/name>` | Uninstall a package |
-| `canopy pkg update [<owner/name>]` | Update one or all packages |
+| `canopy pkg info <github.com/owner/repo>` | Show package details |
+| `canopy pkg install <github.com/owner/repo> [@version]` | Install a package |
+| `canopy pkg uninstall <github.com/owner/name>` | Uninstall a package |
+| `canopy pkg update [<github.com/owner/name>]` | Update one or all packages |
 | `canopy pkg list` | List installed packages |
 | `canopy pkg publish [path] [--repo=owner/repo]` | Publish a package to GitHub |
 
@@ -65,7 +65,7 @@ Create standalone macOS `.app` bundles from any Canopy app. The bundled app is s
 canopy bundle <app-path> [flags]
 ```
 
-The `<app-path>` can be a directory containing JSONL files, or `owner/repo` to bundle an installed package.
+The `<app-path>` can be a directory containing JSONL files, or `github.com/owner/repo` to bundle an installed package.
 
 **Flags:**
 
@@ -93,7 +93,7 @@ canopy bundle myapp/
 canopy bundle -o ~/Desktop/Notes.app sample_apps/notes
 
 # Bundle an installed package
-canopy bundle artpar/calculator
+canopy bundle github.com/artpar/calculator
 
 # Ad-hoc sign (no Apple Developer account needed, works locally)
 canopy bundle --sign --identity "-" myapp/
@@ -176,7 +176,7 @@ build/canopy --mcp-http localhost:8080 mcp
 
 # Package management
 canopy pkg search "todo"
-canopy pkg install artpar/canopy-components
+canopy pkg install github.com/artpar/canopy-components
 canopy pkg list
 
 # Bundle an app into a standalone .app

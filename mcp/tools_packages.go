@@ -116,7 +116,7 @@ func (s *Server) registerPackageInfo() {
 	s.register("package_info", "Get details about a Canopy package", json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"repo": {"type": "string", "description": "GitHub owner/repo"}
+			"repo": {"type": "string", "description": "Package reference (github.com/owner/repo)"}
 		},
 		"required": ["repo"],
 		"additionalProperties": false
@@ -183,7 +183,7 @@ func (s *Server) registerPackageInstall() {
 	s.register("package_install", "Install a Canopy package from GitHub", json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"repo":    {"type": "string", "description": "GitHub owner/repo"},
+			"repo":    {"type": "string", "description": "Package reference (github.com/owner/repo)"},
 			"version": {"type": "string", "description": "Version constraint or tag (default: latest)"}
 		},
 		"required": ["repo"],
@@ -202,7 +202,11 @@ func (s *Server) registerPackageInstall() {
 			return errorResult("github client: " + err.Error())
 		}
 
-		entry, err := registry.Install(s.registry, client, p.Repo, p.Version)
+		ref, err := registry.ParsePackageRef(p.Repo)
+		if err != nil {
+			return errorResult("invalid package reference: " + err.Error())
+		}
+		entry, err := registry.Install(s.registry, client, ref, p.Version)
 		if err != nil {
 			return errorResult("install: " + err.Error())
 		}
@@ -216,7 +220,7 @@ func (s *Server) registerPackageUninstall() {
 	s.register("package_uninstall", "Uninstall a Canopy package", json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"name": {"type": "string", "description": "Package key (owner/repo)"}
+			"name": {"type": "string", "description": "Package key (github.com/owner/repo)"}
 		},
 		"required": ["name"],
 		"additionalProperties": false
@@ -299,7 +303,7 @@ func (s *Server) registerPackagePublish() {
 		"type": "object",
 		"properties": {
 			"path": {"type": "string", "description": "Local directory containing canopy.json"},
-			"repo": {"type": "string", "description": "GitHub owner/repo to publish to"},
+			"repo": {"type": "string", "description": "Package reference to publish to (github.com/owner/repo or owner/repo)"},
 			"tag":  {"type": "string", "description": "Version tag (reads from canopy.json if omitted)"}
 		},
 		"required": ["path"],
@@ -319,7 +323,11 @@ func (s *Server) registerPackagePublish() {
 			return errorResult("github client: " + err.Error())
 		}
 
-		result, err := registry.Publish(client, p.Path, p.Repo, p.Tag)
+		ref, err := registry.ParsePackageRef(p.Repo)
+		if err != nil {
+			return errorResult("invalid package reference: " + err.Error())
+		}
+		result, err := registry.Publish(client, p.Path, ref, p.Tag)
 		if err != nil {
 			return errorResult("publish: " + err.Error())
 		}

@@ -72,13 +72,13 @@ Get detailed information about a package.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `repo` | string | yes | GitHub owner/repo (e.g., `artpar/notes`) |
+| `repo` | string | yes | GitHub package ref (e.g., `github.com/artpar/notes`) |
 
 **Returns:** Package manifest, versions, description, and dependencies.
 
 **Example:**
 ```
-mcp__canopy__package_info(repo: "artpar/notes")
+mcp__canopy__package_info(repo: "github.com/artpar/notes")
 ```
 
 ---
@@ -91,16 +91,16 @@ Install a package from GitHub.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `repo` | string | yes | GitHub owner/repo |
+| `repo` | string | yes | GitHub package ref (e.g., `github.com/artpar/calculator`) |
 | `version` | string | no | Specific version tag (e.g., `1.0.0`). Default: latest. |
 
 **Example:**
 ```
-mcp__canopy__package_install(repo: "artpar/calculator")
+mcp__canopy__package_install(repo: "github.com/artpar/calculator")
 ```
 
 ```
-mcp__canopy__package_install(repo: "artpar/calculator", version: "1.2.0")
+mcp__canopy__package_install(repo: "github.com/artpar/calculator", version: "1.2.0")
 ```
 
 ---
@@ -113,11 +113,11 @@ Remove an installed package.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `name` | string | yes | Package name (owner/name) |
+| `name` | string | yes | Package name (e.g., `github.com/artpar/calculator`) |
 
 **Example:**
 ```
-mcp__canopy__package_uninstall(name: "artpar/calculator")
+mcp__canopy__package_uninstall(name: "github.com/artpar/calculator")
 ```
 
 ---
@@ -134,7 +134,7 @@ Update installed packages to the latest version.
 
 **Example:**
 ```
-mcp__canopy__package_update(name: "artpar/notes")
+mcp__canopy__package_update(name: "github.com/artpar/notes")
 ```
 
 ```
@@ -169,12 +169,14 @@ Publish a package to GitHub.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `path` | string | yes | Path to the package directory |
-| `repo` | string | no | GitHub owner/repo (inferred from git remote if omitted) |
+| `repo` | string | no | GitHub owner/repo (inferred from git remote if omitted; bare `owner/repo` accepted as shorthand) |
 | `tag` | string | no | Version tag (inferred from canopy.json if omitted) |
 
 **Example:**
 ```
-mcp__canopy__package_publish(path: ".", repo: "artpar/my-app")
+mcp__canopy__package_publish(path: ".", repo: "github.com/artpar/my-app")
 ```
 
 Creates a git tag and GitHub Release, and sets the `canopy-package` topic on the repo for discovery.
+
+> **Note:** Bare `owner/repo` is accepted as shorthand for `github.com/owner/repo` in all package tool parameters.

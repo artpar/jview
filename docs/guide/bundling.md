@@ -163,14 +163,16 @@ These are always included because the canopy binary supports all these features.
 
 ## Bundling Installed Packages
 
-If you have installed a package via `canopy pkg install`, you can bundle it directly by `owner/repo`:
+If you have installed a package via `canopy pkg install`, you can bundle it directly by `github.com/owner/repo`:
 
 ```bash
-canopy pkg install artpar/calculator
-canopy bundle artpar/calculator
+canopy pkg install github.com/artpar/calculator
+canopy bundle github.com/artpar/calculator
 ```
 
-This resolves through the local registry to `~/.canopy/apps/artpar/calculator/` and bundles from there.
+This resolves through the local registry to `~/.canopy/apps/github.com/artpar/calculator/` and bundles from there.
+
+> **Note:** Bare `owner/repo` is accepted as shorthand for `github.com/owner/repo`.
 
 ## How Bundled Apps Work
 

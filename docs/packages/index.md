@@ -13,14 +13,14 @@ Canopy packages are GitHub repositories with a `canopy.json` manifest at the roo
 
 1. Every package lives in a GitHub repo with a `canopy.json` file
 2. Packages are discovered via the `canopy-package` GitHub topic
-3. Install with `canopy pkg install owner/repo`
+3. Install with `canopy pkg install github.com/owner/repo`
 4. Installed apps appear in the Canopy menubar menu
 
 ## Package Types
 
 | Type | What it is | Install location |
 |------|-----------|-----------------|
-| **app** | A complete Canopy application | `~/.canopy/apps/{owner}/{name}/` |
+| **app** | A complete Canopy application | `~/.canopy/apps/github.com/{owner}/{name}/` |
 | **component** | A reusable UI component | `~/.canopy/library/{name}.jsonl` |
 | **theme** | Visual theme (colors, fonts) | `~/.canopy/themes/{name}.jsonl` |
 | **ffi-config** | FFI library configuration | `~/.canopy/ffi/{name}.json` |
@@ -32,7 +32,7 @@ Canopy packages are GitHub repositories with a `canopy.json` manifest at the roo
 canopy pkg search calculator
 
 # Install an app
-canopy pkg install artpar/calculator
+canopy pkg install github.com/artpar/calculator
 
 # List what you have installed
 canopy pkg list
