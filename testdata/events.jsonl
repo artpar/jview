@@ -1,0 +1,71 @@
+{"type": "createSurface", "surfaceId": "main", "title": "Event Handling Demo", "width": 500, "height": 400}
+{"type": "updateDataModel", "surfaceId": "main", "ops": [
+  {"op": "add", "path": "/hovered", "value": null},
+  {"op": "add", "path": "/focused", "value": null},
+  {"op": "add", "path": "/clicks", "value": 0}
+]}
+{"type": "updateComponents", "surfaceId": "main", "components": [
+  {
+    "componentId": "root",
+    "type": "Column",
+    "props": {"padding": 20, "gap": 16},
+    "children": ["title", "hover-card", "focus-field", "status"]
+  },
+  {
+    "componentId": "title",
+    "type": "Text",
+    "props": {"content": "Event Handling", "variant": "h1"}
+  },
+  {
+    "componentId": "hover-card",
+    "type": "Card",
+    "props": {
+      "title": "Hover over me",
+      "on": {
+        "mouseEnter": {"dataPath": "/hovered", "dataValue": "hover-card"},
+        "mouseLeave": {"dataPath": "/hovered", "dataValue": null},
+        "doubleClick": {
+          "action": {
+            "functionCall": {
+              "call": "updateDataModel",
+              "args": {
+                "ops": [{"op": "replace", "path": "/clicks", "value": {"functionCall": {"name": "add", "args": [{"path": "/clicks"}, 1]}}}]
+              }
+            }
+          }
+        }
+      }
+    },
+    "children": ["hover-text"]
+  },
+  {
+    "componentId": "hover-text",
+    "type": "Text",
+    "props": {"content": "Double-click to increment counter", "variant": "body"}
+  },
+  {
+    "componentId": "focus-field",
+    "type": "TextField",
+    "props": {
+      "placeholder": "Click to focus...",
+      "dataBinding": "/fieldValue",
+      "on": {
+        "focus": {"dataPath": "/focused", "dataValue": "focus-field"},
+        "blur": {"dataPath": "/focused", "dataValue": null}
+      }
+    }
+  },
+  {
+    "componentId": "status",
+    "type": "Text",
+    "props": {
+      "content": {
+        "functionCall": {
+          "name": "concat",
+          "args": ["Hovered: ", {"path": "/hovered"}, " | Focused: ", {"path": "/focused"}, " | Clicks: ", {"path": "/clicks"}]
+        }
+      },
+      "variant": "caption"
+    }
+  }
+]}

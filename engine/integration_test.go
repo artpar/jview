@@ -1626,3 +1626,208 @@ func (m *mockProcessTransport) Stop() {
 }
 func (m *mockProcessTransport) SendAction(surfaceID string, event *protocol.EventDef, data map[string]interface{}) {
 }
+
+// --- Generic event system tests ---
+
+func TestGenericOnPropClickBackwardCompat(t *testing.T) {
+	// Verify that "on":{"click":{...}} works identically to "onClick":{...}
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	var firedEvent string
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","on":{"click":{"action":{"event":{"name":"clicked"}}}}}}]}`)
+
+	if surf, ok := sess.surfaces["s1"]; ok {
+		surf.ActionHandler = func(sid string, event *protocol.EventDef, data map[string]interface{}) {
+			firedEvent = event.Name
+		}
+	}
+	mock.InvokeCallback("s1", "btn", "click", "")
+	if firedEvent != "clicked" {
+		t.Errorf("firedEvent = %q, want clicked", firedEvent)
+	}
+}
+
+func TestGenericOnPropDataPath(t *testing.T) {
+	// Verify that DataPath on an event handler writes to the data model
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/hovered","value":false}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"card","type":"Card","props":{"title":"Hover me","on":{"mouseEnter":{"dataPath":"/hovered","dataValue":true},"mouseLeave":{"dataPath":"/hovered","dataValue":false}}}},{"componentId":"indicator","type":"Text","props":{"content":{"path":"/hovered"}}}]}`)
+
+	// Simulate mouseEnter
+	initialUpdates := len(mock.Updated)
+	mock.InvokeCallback("s1", "card", "mouseEnter", `{"x":100,"y":50}`)
+
+	// Check that /hovered is now true
+	if surf, ok := sess.surfaces["s1"]; ok {
+		val, found := surf.dm.Get("/hovered")
+		if !found {
+			t.Fatal("/hovered not found in data model")
+		}
+		if val != true {
+			t.Errorf("/hovered = %v, want true", val)
+		}
+	}
+
+	// Check that indicator text was re-rendered
+	newUpdates := mock.Updated[initialUpdates:]
+	foundUpdate := false
+	for _, u := range newUpdates {
+		if u.Node != nil && u.Node.ComponentID == "indicator" {
+			foundUpdate = true
+		}
+	}
+	if !foundUpdate {
+		t.Error("DataPath write did not trigger indicator re-render")
+	}
+
+	// Simulate mouseLeave
+	mock.InvokeCallback("s1", "card", "mouseLeave", `{"x":0,"y":0}`)
+	if surf, ok := sess.surfaces["s1"]; ok {
+		val, _ := surf.dm.Get("/hovered")
+		if val != false {
+			t.Errorf("/hovered after mouseLeave = %v, want false", val)
+		}
+	}
+}
+
+func TestGenericOnPropEventDataMerge(t *testing.T) {
+	// Verify that native JSON data is merged into server event resolved map
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	var receivedData map[string]interface{}
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"zone","type":"Card","props":{"on":{"drop":{"action":{"event":{"name":"fileDrop"}}}}}}]}`)
+
+	if surf, ok := sess.surfaces["s1"]; ok {
+		surf.ActionHandler = func(sid string, event *protocol.EventDef, data map[string]interface{}) {
+			receivedData = data
+		}
+	}
+
+	mock.InvokeCallback("s1", "zone", "drop", `{"paths":["/tmp/file.txt"],"text":"hello"}`)
+
+	if receivedData == nil {
+		t.Fatal("action handler not called")
+	}
+	if receivedData["text"] != "hello" {
+		t.Errorf("text = %v, want hello", receivedData["text"])
+	}
+	paths, ok := receivedData["paths"].([]interface{})
+	if !ok || len(paths) != 1 {
+		t.Errorf("paths = %v, want [/tmp/file.txt]", receivedData["paths"])
+	}
+}
+
+func TestGenericOnPropCallbackRegistration(t *testing.T) {
+	// Verify that generic event names produce callbacks in the render node
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"card","type":"Card","props":{"title":"Events","on":{"mouseEnter":{"dataPath":"/h","dataValue":true},"focus":{"dataPath":"/f","dataValue":true},"doubleClick":{"action":{"event":{"name":"dblClick"}}}}}}]}`)
+
+	// Find the created card and check its callbacks
+	for _, c := range mock.Created {
+		if c.Node.ComponentID == "card" {
+			cbs := c.Node.Callbacks
+			if _, ok := cbs["mouseEnter"]; !ok {
+				t.Error("mouseEnter callback not registered")
+			}
+			if _, ok := cbs["focus"]; !ok {
+				t.Error("focus callback not registered")
+			}
+			if _, ok := cbs["doubleClick"]; !ok {
+				t.Error("doubleClick callback not registered")
+			}
+			return
+		}
+	}
+	t.Fatal("card not found in created views")
+}
+
+func TestOnPropCoexistsWithDataBinding(t *testing.T) {
+	// Verify that a TextField with DataBinding + on.change action fires both
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	var firedEvent string
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/name","value":""}]}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"field","type":"TextField","props":{"value":{"path":"/name"},"dataBinding":"/name","on":{"change":{"action":{"event":{"name":"nameChanged"}}}}}},{"componentId":"display","type":"Text","props":{"content":{"path":"/name"}}}]}`)
+
+	if surf, ok := sess.surfaces["s1"]; ok {
+		surf.ActionHandler = func(sid string, event *protocol.EventDef, data map[string]interface{}) {
+			firedEvent = event.Name
+		}
+	}
+
+	mock.InvokeCallback("s1", "field", "change", "Alice")
+
+	// Data binding should have updated the data model
+	if surf, ok := sess.surfaces["s1"]; ok {
+		val, _ := surf.dm.Get("/name")
+		if val != "Alice" {
+			t.Errorf("/name = %v, want Alice", val)
+		}
+	}
+
+	// The on.change action should have fired
+	if firedEvent != "nameChanged" {
+		t.Errorf("firedEvent = %q, want nameChanged", firedEvent)
+	}
+}
+
+func TestNamedPropNormalization(t *testing.T) {
+	// Verify that onClick prop gets normalized into On map and fires
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	var firedEvent string
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"card","type":"Card","props":{"title":"Click","onClick":{"action":{"event":{"name":"cardClicked"}}}}}]}`)
+
+	if surf, ok := sess.surfaces["s1"]; ok {
+		surf.ActionHandler = func(sid string, event *protocol.EventDef, data map[string]interface{}) {
+			firedEvent = event.Name
+		}
+	}
+
+	mock.InvokeCallback("s1", "card", "click", "")
+	if firedEvent != "cardClicked" {
+		t.Errorf("firedEvent = %q, want cardClicked", firedEvent)
+	}
+}
+
+func TestOnMapWinsOverNamedProp(t *testing.T) {
+	// When both onClick and on.click exist, on.click takes precedence
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	var firedEvent string
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateComponents","surfaceId":"s1","components":[{"componentId":"btn","type":"Button","props":{"label":"Go","onClick":{"action":{"event":{"name":"fromOnClick"}}},"on":{"click":{"action":{"event":{"name":"fromOnMap"}}}}}}]}`)
+
+	if surf, ok := sess.surfaces["s1"]; ok {
+		surf.ActionHandler = func(sid string, event *protocol.EventDef, data map[string]interface{}) {
+			firedEvent = event.Name
+		}
+	}
+
+	mock.InvokeCallback("s1", "btn", "click", "")
+	if firedEvent != "fromOnMap" {
+		t.Errorf("firedEvent = %q, want fromOnMap (on map should win)", firedEvent)
+	}
+}

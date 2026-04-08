@@ -19,8 +19,12 @@ import (
 
 // cleanupView performs type-specific cleanup before removing a view.
 // Audio/Video need observer removal and player pause; Modal needs delegate nil and panel close.
+// Event monitors (tracking areas, gesture recognizers, KVO) are removed for all view types.
 // Other types are handled by ARC when removeFromSuperview is called.
 func cleanupView(handle renderer.ViewHandle, compType protocol.ComponentType) {
+	// Remove generic event monitors (mouseEnter/Leave, focus/blur, etc.)
+	removeAllEventMonitors(handle)
+
 	switch compType {
 	case protocol.CompAudioPlayer:
 		C.JVCleanupAudio(unsafe.Pointer(handle))

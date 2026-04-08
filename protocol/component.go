@@ -226,6 +226,12 @@ type Props struct {
 	// Drag & Drop
 	OnDrop *EventAction `json:"onDrop,omitempty"` // fired when files/text dropped; data: {"paths":[...],"text":"..."}
 
+	// Generic event handlers: maps event names to handlers.
+	// Supports any event type (mouseEnter, keyDown, focus, etc.)
+	// Named props (OnClick, OnChange, etc.) are syntactic sugar — they are
+	// normalized into this map before callback registration.
+	On map[string]*EventAction `json:"on,omitempty"`
+
 	// Universal props
 	ContextMenu json.RawMessage `json:"contextMenu,omitempty"` // []MenuItem for right-click menu
 }

@@ -169,6 +169,13 @@ func (r *DarwinRenderer) CreateView(surfaceID string, node *renderer.RenderNode)
 		EnableDropTarget(uintptr(handle), uint64(cbID))
 	}
 
+	// Install generic event monitors (mouseEnter, mouseLeave, focus, blur, etc.)
+	for eventName, cbID := range node.Callbacks {
+		if eventMonitorEvents[eventName] && cbID != 0 {
+			installEventMonitor(handle, eventName, uint64(cbID))
+		}
+	}
+
 	// Attach context menu if specified
 	if node.Props.ContextMenu != "" {
 		attachContextMenu(uintptr(handle), node.Props.ContextMenu)
@@ -263,6 +270,13 @@ func (r *DarwinRenderer) UpdateView(surfaceID string, handle renderer.ViewHandle
 	// Update drop target callback ID
 	if cbID, ok := node.Callbacks["drop"]; ok && cbID != 0 {
 		UpdateDropTargetCallbackID(uintptr(handle), uint64(cbID))
+	}
+
+	// Update generic event monitor callback IDs
+	for eventName, cbID := range node.Callbacks {
+		if eventMonitorEvents[eventName] && cbID != 0 {
+			updateEventMonitorCallbackID(handle, eventName, uint64(cbID))
+		}
 	}
 
 	// Update context menu

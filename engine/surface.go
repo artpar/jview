@@ -768,56 +768,139 @@ func (s *Surface) executeSetTheme(args interface{}) {
 	})
 }
 
-func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.RenderNode) {
-	node.Callbacks = make(map[string]renderer.CallbackID)
-
-	// Unregister any existing callbacks for this component before re-registering
-	if old, exists := s.activeCallbacks[comp.ComponentID]; exists {
-		for _, cbID := range old {
-			s.rend.UnregisterCallback(cbID)
+// normalizeEventProps folds named event props (OnClick, OnChange, etc.) into the
+// generic On map. The On map is the single code path for callback registration.
+// Named props are syntactic sugar — On map entries take precedence if both exist.
+func normalizeEventProps(comp *protocol.Component) {
+	if comp.Props.On == nil {
+		comp.Props.On = make(map[string]*protocol.EventAction)
+	}
+	fold := func(name string, ea *protocol.EventAction) {
+		if ea != nil {
+			if _, exists := comp.Props.On[name]; !exists {
+				comp.Props.On[name] = ea
+			}
 		}
-		delete(s.activeCallbacks, comp.ComponentID)
+	}
+	fold("click", comp.Props.OnClick)
+	fold("change", comp.Props.OnChange)
+	fold("toggle", comp.Props.OnToggle)
+	fold("slide", comp.Props.OnSlide)
+	fold("select", comp.Props.OnSelect)
+	fold("dateChange", comp.Props.OnDateChange)
+	fold("drop", comp.Props.OnDrop)
+	fold("dismiss", comp.Props.OnDismiss)
+	fold("capture", comp.Props.OnCapture)
+	fold("error", comp.Props.OnError)
+	fold("ended", comp.Props.OnEnded)
+	fold("search", comp.Props.OnSearch)
+	fold("richChange", comp.Props.OnRichChange)
+	fold("recordingStarted", comp.Props.OnRecordingStarted)
+	fold("recordingStopped", comp.Props.OnRecordingStopped)
+	fold("level", comp.Props.OnLevel)
+}
+
+// rerenderAffectedExcluding re-renders components affected by data model changes,
+// excluding the source component to avoid feedback loops.
+func (s *Surface) rerenderAffectedExcluding(excludeID string, changed []string) {
+	affected := s.tracker.Affected(changed)
+	var toRender []string
+	for _, id := range affected {
+		if id != excludeID {
+			toRender = append(toRender, id)
+		}
+	}
+	if len(toRender) > 0 {
+		s.renderComponents(toRender)
+	}
+}
+
+// executeEventAction dispatches an event action: writes to DataPath, then fires
+// the Action (event/functionCall/standardAction). Native event data is merged into
+// server event resolved maps and made available at /_input for dataRefs.
+func (s *Surface) executeEventAction(ea *protocol.EventAction, nativeData string) {
+	if ea == nil {
+		return
 	}
 
-	switch comp.Type {
-	case protocol.CompButton:
-		if comp.Props.OnClick != nil && comp.Props.OnClick.Action != nil {
-			action := comp.Props.OnClick.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "click", func(data string) {
-				if action.StandardAction != "" {
-					s.dispatch.RunOnMain(func() {
-						s.rend.PerformAction(action.StandardAction)
-					})
-				} else if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["click"] = cbID
-			s.trackCallback(comp.ComponentID, "click", cbID)
+	// DataPath write: update data model with event data or a fixed value
+	if ea.DataPath != "" {
+		value := ea.DataValue
+		if value == nil && nativeData != "" {
+			var parsed interface{}
+			if err := json.Unmarshal([]byte(nativeData), &parsed); err == nil {
+				value = parsed
+			} else {
+				value = nativeData
+			}
 		}
+		if value != nil {
+			changed, err := s.dm.Set(ea.DataPath, value)
+			if err == nil {
+				affected := s.tracker.Affected(changed)
+				if len(affected) > 0 {
+					s.renderComponents(affected)
+				}
+			}
+		}
+	}
 
+	// Action dispatch
+	if ea.Action == nil {
+		return
+	}
+	action := ea.Action
+
+	// Make native data available via /_input for dataRefs backward compat
+	if nativeData != "" {
+		s.dm.Set("/_input", nativeData)
+		defer s.dm.Delete("/_input")
+	}
+
+	if action.StandardAction != "" {
+		s.dispatch.RunOnMain(func() {
+			s.rend.PerformAction(action.StandardAction)
+		})
+	} else if action.Event != nil {
+		resolved := s.resolveDataRefs(action.Event)
+		// Merge native JSON data into resolved map
+		if nativeData != "" {
+			var nativeMap map[string]interface{}
+			if json.Unmarshal([]byte(nativeData), &nativeMap) == nil && nativeMap != nil {
+				for k, v := range nativeMap {
+					resolved[k] = v
+				}
+			}
+		}
+		if s.ActionHandler != nil {
+			s.ActionHandler(s.id, action.Event, resolved)
+		}
+	} else if action.FunctionCall != nil {
+		s.executeFunctionCall(action.FunctionCall)
+	}
+}
+
+// makeDataBindingCallbacks returns type-specific data binding handlers for a component.
+// These handle the native widget value → DataModel write → re-render cycle.
+// The map key is the event type (e.g., "change", "toggle", "slide").
+func (s *Surface) makeDataBindingCallbacks(comp *protocol.Component) map[string]func(string) {
+	callbacks := make(map[string]func(string))
+	compID := comp.ComponentID
+	binding := comp.Props.DataBinding
+
+	switch comp.Type {
 	case protocol.CompTextField:
-		if comp.Props.DataBinding != "" {
-			binding := comp.Props.DataBinding
-			compID := comp.ComponentID
+		if binding != "" {
 			validations := comp.Props.Validations
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "change", func(value string) {
+			callbacks["change"] = func(value string) {
 				changed, err := s.dm.Set(binding, value)
 				if err != nil {
 					logWarn("binding", s.id, fmt.Sprintf("binding set error: %v", err))
 					return
 				}
-				// Run validation
 				errors := s.validator.Validate(value, validations)
 				s.validationErrors[compID] = errors
-
 				affected := s.tracker.Affected(changed)
-				// Re-render the field itself (for validation display) plus affected
 				toRender := []string{compID}
 				for _, id := range affected {
 					if id != compID {
@@ -825,42 +908,25 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 					}
 				}
 				s.renderComponents(toRender)
-			})
-			node.Callbacks["change"] = cbID
-			s.trackCallback(comp.ComponentID, "change", cbID)
+			}
 		}
 
 	case protocol.CompCheckBox:
-		if comp.Props.DataBinding != "" {
-			binding := comp.Props.DataBinding
-			compID := comp.ComponentID
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "toggle", func(value string) {
+		if binding != "" {
+			callbacks["toggle"] = func(value string) {
 				boolVal := value == "true" || value == "1"
 				changed, err := s.dm.Set(binding, boolVal)
 				if err != nil {
 					logWarn("binding", s.id, fmt.Sprintf("binding set error: %v", err))
 					return
 				}
-				affected := s.tracker.Affected(changed)
-				var toRender []string
-				for _, id := range affected {
-					if id != compID {
-						toRender = append(toRender, id)
-					}
-				}
-				if len(toRender) > 0 {
-					s.renderComponents(toRender)
-				}
-			})
-			node.Callbacks["toggle"] = cbID
-			s.trackCallback(comp.ComponentID, "toggle", cbID)
+				s.rerenderAffectedExcluding(compID, changed)
+			}
 		}
 
 	case protocol.CompSlider:
-		if comp.Props.DataBinding != "" {
-			binding := comp.Props.DataBinding
-			compID := comp.ComponentID
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "slide", func(value string) {
+		if binding != "" {
+			callbacks["slide"] = func(value string) {
 				var fVal float64
 				fmt.Sscanf(value, "%f", &fVal)
 				changed, err := s.dm.Set(binding, fVal)
@@ -868,367 +934,66 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 					logWarn("binding", s.id, fmt.Sprintf("slider binding error: %v", err))
 					return
 				}
-				affected := s.tracker.Affected(changed)
-				var toRender []string
-				for _, id := range affected {
-					if id != compID {
-						toRender = append(toRender, id)
-					}
-				}
-				if len(toRender) > 0 {
-					s.renderComponents(toRender)
-				}
-			})
-			node.Callbacks["slide"] = cbID
-			s.trackCallback(comp.ComponentID, "slide", cbID)
+				s.rerenderAffectedExcluding(compID, changed)
+			}
 		}
 
-	case protocol.CompChoicePicker:
-		if comp.Props.DataBinding != "" {
-			binding := comp.Props.DataBinding
-			compID := comp.ComponentID
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "select", func(value string) {
+	case protocol.CompChoicePicker, protocol.CompTabs, protocol.CompOutlineView:
+		if binding != "" {
+			callbacks["select"] = func(value string) {
 				changed, err := s.dm.Set(binding, value)
 				if err != nil {
-					logWarn("binding", s.id, fmt.Sprintf("picker binding error: %v", err))
+					logWarn("binding", s.id, fmt.Sprintf("select binding error: %v", err))
 					return
 				}
-				affected := s.tracker.Affected(changed)
-				var toRender []string
-				for _, id := range affected {
-					if id != compID {
-						toRender = append(toRender, id)
-					}
-				}
-				if len(toRender) > 0 {
-					s.renderComponents(toRender)
-				}
-			})
-			node.Callbacks["select"] = cbID
-			s.trackCallback(comp.ComponentID, "select", cbID)
+				s.rerenderAffectedExcluding(compID, changed)
+			}
 		}
 
 	case protocol.CompDateTimeInput:
-		if comp.Props.DataBinding != "" {
-			binding := comp.Props.DataBinding
-			compID := comp.ComponentID
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "datechange", func(value string) {
+		if binding != "" {
+			callbacks["datechange"] = func(value string) {
 				changed, err := s.dm.Set(binding, value)
 				if err != nil {
 					logWarn("binding", s.id, fmt.Sprintf("date binding error: %v", err))
 					return
 				}
-				affected := s.tracker.Affected(changed)
-				var toRender []string
-				for _, id := range affected {
-					if id != compID {
-						toRender = append(toRender, id)
-					}
-				}
-				if len(toRender) > 0 {
-					s.renderComponents(toRender)
-				}
-			})
-			node.Callbacks["datechange"] = cbID
-			s.trackCallback(comp.ComponentID, "datechange", cbID)
-		}
-
-	case protocol.CompTabs:
-		if comp.Props.DataBinding != "" {
-			binding := comp.Props.DataBinding
-			compID := comp.ComponentID
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "select", func(value string) {
-				changed, err := s.dm.Set(binding, value)
-				if err != nil {
-					logWarn("binding", s.id, fmt.Sprintf("tabs binding error: %v", err))
-					return
-				}
-				affected := s.tracker.Affected(changed)
-				var toRender []string
-				for _, id := range affected {
-					if id != compID {
-						toRender = append(toRender, id)
-					}
-				}
-				if len(toRender) > 0 {
-					s.renderComponents(toRender)
-				}
-			})
-			node.Callbacks["select"] = cbID
-			s.trackCallback(comp.ComponentID, "select", cbID)
-		}
-
-	case protocol.CompVideo:
-		if comp.Props.OnEnded != nil && comp.Props.OnEnded.Action != nil {
-			action := comp.Props.OnEnded.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "ended", func(data string) {
-				if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["ended"] = cbID
-			s.trackCallback(comp.ComponentID, "ended", cbID)
-		}
-
-	case protocol.CompAudioPlayer:
-		if comp.Props.OnEnded != nil && comp.Props.OnEnded.Action != nil {
-			action := comp.Props.OnEnded.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "ended", func(data string) {
-				if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["ended"] = cbID
-			s.trackCallback(comp.ComponentID, "ended", cbID)
-		}
-
-	case protocol.CompCameraView:
-		if comp.Props.OnCapture != nil && comp.Props.OnCapture.Action != nil {
-			action := comp.Props.OnCapture.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "capture", func(data string) {
-				if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					var captureData map[string]interface{}
-					json.Unmarshal([]byte(data), &captureData)
-					if captureData != nil {
-						for k, v := range captureData {
-							resolved[k] = v
-						}
-					}
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["capture"] = cbID
-			s.trackCallback(comp.ComponentID, "capture", cbID)
-		}
-		if comp.Props.OnError != nil && comp.Props.OnError.Action != nil {
-			action := comp.Props.OnError.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "error", func(data string) {
-				if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					var errData map[string]interface{}
-					json.Unmarshal([]byte(data), &errData)
-					if errData != nil {
-						for k, v := range errData {
-							resolved[k] = v
-						}
-					}
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["error"] = cbID
-			s.trackCallback(comp.ComponentID, "error", cbID)
-		}
-
-	case protocol.CompAudioRecorder:
-		if comp.Props.OnRecordingStarted != nil && comp.Props.OnRecordingStarted.Action != nil {
-			action := comp.Props.OnRecordingStarted.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "recordingStarted", func(data string) {
-				if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["recordingStarted"] = cbID
-			s.trackCallback(comp.ComponentID, "recordingStarted", cbID)
-		}
-		if comp.Props.OnRecordingStopped != nil && comp.Props.OnRecordingStopped.Action != nil {
-			action := comp.Props.OnRecordingStopped.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "recordingStopped", func(data string) {
-				if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					var recData map[string]interface{}
-					json.Unmarshal([]byte(data), &recData)
-					if recData != nil {
-						for k, v := range recData {
-							resolved[k] = v
-						}
-					}
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["recordingStopped"] = cbID
-			s.trackCallback(comp.ComponentID, "recordingStopped", cbID)
-		}
-		if comp.Props.OnLevel != nil && comp.Props.OnLevel.Action != nil {
-			action := comp.Props.OnLevel.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "level", func(data string) {
-				if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					var levelData map[string]interface{}
-					json.Unmarshal([]byte(data), &levelData)
-					if levelData != nil {
-						for k, v := range levelData {
-							resolved[k] = v
-						}
-					}
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["level"] = cbID
-			s.trackCallback(comp.ComponentID, "level", cbID)
-		}
-		if comp.Props.OnError != nil && comp.Props.OnError.Action != nil {
-			action := comp.Props.OnError.Action
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "error", func(data string) {
-				if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					var errData map[string]interface{}
-					json.Unmarshal([]byte(data), &errData)
-					if errData != nil {
-						for k, v := range errData {
-							resolved[k] = v
-						}
-					}
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["error"] = cbID
-			s.trackCallback(comp.ComponentID, "error", cbID)
+				s.rerenderAffectedExcluding(compID, changed)
+			}
 		}
 
 	case protocol.CompSearchField:
-		if comp.Props.DataBinding != "" {
-			binding := comp.Props.DataBinding
-			compID := comp.ComponentID
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "change", func(value string) {
+		if binding != "" {
+			callbacks["change"] = func(value string) {
 				changed, err := s.dm.Set(binding, value)
 				if err != nil {
 					logWarn("binding", s.id, fmt.Sprintf("searchfield binding error: %v", err))
 					return
 				}
-				affected := s.tracker.Affected(changed)
-				var toRender []string
-				for _, id := range affected {
-					if id != compID {
-						toRender = append(toRender, id)
-					}
-				}
-				if len(toRender) > 0 {
-					s.renderComponents(toRender)
-				}
-			})
-			node.Callbacks["change"] = cbID
-			s.trackCallback(comp.ComponentID, "change", cbID)
-		}
-
-	case protocol.CompOutlineView:
-		if comp.Props.DataBinding != "" {
-			binding := comp.Props.DataBinding
-			compID := comp.ComponentID
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "select", func(value string) {
-				changed, err := s.dm.Set(binding, value)
-				if err != nil {
-					logWarn("binding", s.id, fmt.Sprintf("outlineview binding error: %v", err))
-					return
-				}
-				affected := s.tracker.Affected(changed)
-				var toRender []string
-				for _, id := range affected {
-					if id != compID {
-						toRender = append(toRender, id)
-					}
-				}
-				if len(toRender) > 0 {
-					s.renderComponents(toRender)
-				}
-			})
-			node.Callbacks["select"] = cbID
-			s.trackCallback(comp.ComponentID, "select", cbID)
+				s.rerenderAffectedExcluding(compID, changed)
+			}
 		}
 
 	case protocol.CompRichTextEditor:
-		compID := comp.ComponentID
-		binding := comp.Props.DataBinding
-		onChange := comp.Props.OnChange
-		if binding != "" || onChange != nil {
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "change", func(value string) {
-				var allChanged []string
-				// Write to dataBinding path if set
-				if binding != "" {
-					changed, err := s.dm.Set(binding, value)
-					if err != nil {
-						logWarn("binding", s.id, fmt.Sprintf("richtexteditor binding error: %v", err))
-						return
-					}
-					allChanged = append(allChanged, changed...)
+		if binding != "" {
+			callbacks["change"] = func(value string) {
+				changed, err := s.dm.Set(binding, value)
+				if err != nil {
+					logWarn("binding", s.id, fmt.Sprintf("richtexteditor binding error: %v", err))
+					return
 				}
-				// Fire onChange action — write value to /_input so action can reference it
-				if onChange != nil && onChange.Action != nil {
-					s.dm.Set("/_input", value)
-					action := onChange.Action
-					if action.FunctionCall != nil {
-						s.executeFunctionCall(action.FunctionCall)
-					} else if action.Event != nil && s.ActionHandler != nil {
-						resolved := make(map[string]interface{})
-						for _, ref := range action.Event.DataRefs {
-							val, _ := s.dm.Get(ref)
-							resolved[ref] = val
-						}
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-					s.dm.Delete("/_input")
-				}
-				// Re-render affected components (excluding source editor)
-				if binding != "" {
-					affected := s.tracker.Affected(allChanged)
-					var toRender []string
-					for _, id := range affected {
-						if id != compID {
-							toRender = append(toRender, id)
-						}
-					}
-					if len(toRender) > 0 {
-						s.renderComponents(toRender)
-					}
-				}
-			})
-			node.Callbacks["change"] = cbID
-			s.trackCallback(comp.ComponentID, "change", cbID)
+				s.rerenderAffectedExcluding(compID, changed)
+			}
 		}
 		if comp.Props.FormatBinding != "" {
-			binding := comp.Props.FormatBinding
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "formatchange", func(data string) {
+			fmtBinding := comp.Props.FormatBinding
+			callbacks["formatchange"] = func(data string) {
 				var formatState map[string]interface{}
 				if err := json.Unmarshal([]byte(data), &formatState); err != nil {
 					logWarn("binding", s.id, fmt.Sprintf("formatchange parse error: %v", err))
 					return
 				}
-				changed, err := s.dm.Set(binding, formatState)
+				changed, err := s.dm.Set(fmtBinding, formatState)
 				if err != nil {
 					logWarn("binding", s.id, fmt.Sprintf("formatchange binding error: %v", err))
 					return
@@ -1237,16 +1002,12 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 				if len(affected) > 0 {
 					s.renderComponents(affected)
 				}
-			})
-			node.Callbacks["formatchange"] = cbID
-			s.trackCallback(comp.ComponentID, "formatchange", cbID)
+			}
 		}
 
 	case protocol.CompModal:
-		binding := comp.Props.DataBinding
-		compID := comp.ComponentID
-		onDismiss := comp.Props.OnDismiss
-		cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "dismiss", func(data string) {
+		// Modal dismiss: always registered. Writes false to binding and re-renders self.
+		callbacks["dismiss"] = func(data string) {
 			var allChanged []string
 			if binding != "" {
 				changed, err := s.dm.Set(binding, false)
@@ -1254,16 +1015,6 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 					logWarn("binding", s.id, fmt.Sprintf("modal binding error: %v", err))
 				} else {
 					allChanged = append(allChanged, changed...)
-				}
-			}
-			if onDismiss != nil && onDismiss.Action != nil {
-				if onDismiss.Action.Event != nil {
-					resolved := s.resolveDataRefs(onDismiss.Action.Event)
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, onDismiss.Action.Event, resolved)
-					}
-				} else if onDismiss.Action.FunctionCall != nil {
-					s.executeFunctionCall(onDismiss.Action.FunctionCall)
 				}
 			}
 			affected := s.tracker.Affected(allChanged)
@@ -1275,9 +1026,70 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 			}
 			toRender = append(toRender, compID)
 			s.renderComponents(toRender)
+		}
+	}
+
+	// Any component with DataBinding + onDrop: write drop data to binding path
+	if binding != "" {
+		if _, hasDrop := comp.Props.On["drop"]; hasDrop {
+			callbacks["drop"] = func(data string) {
+				var dropData map[string]interface{}
+				json.Unmarshal([]byte(data), &dropData)
+				if dropData != nil {
+					changed, err := s.dm.Set(binding, dropData)
+					if err == nil {
+						affected := s.tracker.Affected(changed)
+						if len(affected) > 0 {
+							s.renderComponents(affected)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return callbacks
+}
+
+func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.RenderNode) {
+	normalizeEventProps(comp)
+	node.Callbacks = make(map[string]renderer.CallbackID)
+
+	// Unregister any existing callbacks for this component before re-registering
+	if old, exists := s.activeCallbacks[comp.ComponentID]; exists {
+		for _, cbID := range old {
+			s.rend.UnregisterCallback(cbID)
+		}
+		delete(s.activeCallbacks, comp.ComponentID)
+	}
+
+	// Get type-specific data binding handlers
+	bindingCallbacks := s.makeDataBindingCallbacks(comp)
+
+	// Collect all event types (union of On map + binding handlers)
+	allEvents := make(map[string]struct{})
+	for eventName := range comp.Props.On {
+		allEvents[eventName] = struct{}{}
+	}
+	for eventName := range bindingCallbacks {
+		allEvents[eventName] = struct{}{}
+	}
+
+	// Register combined callbacks for each event
+	for eventName := range allEvents {
+		bFn := bindingCallbacks[eventName]
+		eAction := comp.Props.On[eventName]
+
+		cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, eventName, func(data string) {
+			if bFn != nil {
+				bFn(data)
+			}
+			if eAction != nil {
+				s.executeEventAction(eAction, data)
+			}
 		})
-		node.Callbacks["dismiss"] = cbID
-		s.trackCallback(comp.ComponentID, "dismiss", cbID)
+		node.Callbacks[eventName] = cbID
+		s.trackCallback(comp.ComponentID, eventName, cbID)
 	}
 
 	// Context menu support for any component type
@@ -1289,73 +1101,6 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 				node.Props.ContextMenu = string(data)
 			}
 		}
-	}
-
-	// General onClick support for any component type (if not already handled above)
-	if _, hasClick := node.Callbacks["click"]; !hasClick {
-		if comp.Props.OnClick != nil && comp.Props.OnClick.Action != nil {
-			action := comp.Props.OnClick.Action
-			compIDForLog := comp.ComponentID
-			cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "click", func(data string) {
-				jlog.Infof("click", s.id, "onClick: %s", compIDForLog)
-				if action.StandardAction != "" {
-					s.dispatch.RunOnMain(func() {
-						s.rend.PerformAction(action.StandardAction)
-					})
-				} else if action.Event != nil {
-					resolved := s.resolveDataRefs(action.Event)
-					if s.ActionHandler != nil {
-						s.ActionHandler(s.id, action.Event, resolved)
-					}
-				} else if action.FunctionCall != nil {
-					s.executeFunctionCall(action.FunctionCall)
-				}
-			})
-			node.Callbacks["click"] = cbID
-			s.trackCallback(comp.ComponentID, "click", cbID)
-		}
-	}
-
-	// onDrop support for any component type
-	if comp.Props.OnDrop != nil && comp.Props.OnDrop.Action != nil {
-		action := comp.Props.OnDrop.Action
-		compIDForLog := comp.ComponentID
-		binding := comp.Props.DataBinding
-		cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, "drop", func(data string) {
-			jlog.Infof("drop", s.id, "onDrop: %s data=%s", compIDForLog, data)
-
-			// Parse drop data
-			var dropData map[string]interface{}
-			json.Unmarshal([]byte(data), &dropData)
-
-			// Write to data binding path if specified
-			if binding != "" && dropData != nil {
-				changed, err := s.dm.Set(binding, dropData)
-				if err == nil {
-					affected := s.tracker.Affected(changed)
-					if len(affected) > 0 {
-						s.renderComponents(affected)
-					}
-				}
-			}
-
-			// Fire action
-			if action.Event != nil {
-				resolved := s.resolveDataRefs(action.Event)
-				if dropData != nil {
-					for k, v := range dropData {
-						resolved[k] = v
-					}
-				}
-				if s.ActionHandler != nil {
-					s.ActionHandler(s.id, action.Event, resolved)
-				}
-			} else if action.FunctionCall != nil {
-				s.executeFunctionCall(action.FunctionCall)
-			}
-		})
-		node.Callbacks["drop"] = cbID
-		s.trackCallback(comp.ComponentID, "drop", cbID)
 	}
 }
 

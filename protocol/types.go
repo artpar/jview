@@ -29,6 +29,8 @@ const (
 	MsgUpdateToolbar    MessageType = "updateToolbar"
 	MsgUpdateWindow     MessageType = "updateWindow"
 	MsgSetAppMode       MessageType = "setAppMode"
+	MsgOn               MessageType = "on"
+	MsgOff              MessageType = "off"
 )
 
 // TestMessage defines a test case with a sequence of assert/simulate steps.
@@ -257,4 +259,22 @@ type MenuItem struct {
 	Children       []MenuItem      `json:"children,omitempty"`
 	Icon           string          `json:"icon,omitempty"`     // SF Symbol name
 	Disabled       *DynamicBoolean `json:"disabled,omitempty"` // grayed out when true
+}
+
+// OnMessage subscribes to a surface-level or system-level event.
+// Surface events (window.resize, window.close, etc.) require a SurfaceID.
+// System events (system.timer, system.fs.watch, etc.) are session-scoped.
+type OnMessage struct {
+	Type      MessageType            `json:"type"`
+	SurfaceID string                 `json:"surfaceId,omitempty"` // empty = session/app-level
+	ID        string                 `json:"id,omitempty"`        // subscription ID for later removal via off
+	Event     string                 `json:"event"`               // e.g. "window.resize", "system.timer"
+	Config    map[string]interface{} `json:"config,omitempty"`    // source-specific configuration
+	Handler   EventAction            `json:"handler"`
+}
+
+// OffMessage removes a previously registered event subscription.
+type OffMessage struct {
+	Type MessageType `json:"type"`
+	ID   string      `json:"id"` // subscription ID from the on message
 }
