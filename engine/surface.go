@@ -47,6 +47,9 @@ type Surface struct {
 	// Flushed as a single render pass when a different message type arrives.
 	pendingComponents []protocol.Component
 
+	// throttlers tracks rate limiters: "componentID:eventName" → Throttler
+	throttlers map[string]*Throttler
+
 	// ActionHandler is called when a component triggers a server-bound event.
 	ActionHandler func(surfaceID string, event *protocol.EventDef, data map[string]interface{})
 }
@@ -172,11 +175,19 @@ func (s *Surface) FlushPendingComponents() {
 // cleanupComponents removes orphaned components: unregisters callbacks, bindings,
 // validation errors, and dispatches RemoveView for each.
 func (s *Surface) cleanupComponents(removedIDs []string) {
-	// Unregister callbacks and bindings (Go-side, no dispatch needed)
+	// Unregister callbacks, bindings, and throttlers (Go-side, no dispatch needed)
 	for _, id := range removedIDs {
 		if events, exists := s.activeCallbacks[id]; exists {
-			for _, cbID := range events {
+			for eventType, cbID := range events {
 				s.rend.UnregisterCallback(cbID)
+				// Clean up throttler for this component:event
+				if s.throttlers != nil {
+					key := id + ":" + eventType
+					if t, ok := s.throttlers[key]; ok {
+						t.Stop()
+						delete(s.throttlers, key)
+					}
+				}
 			}
 			delete(s.activeCallbacks, id)
 		}
@@ -1133,14 +1144,42 @@ func (s *Surface) registerCallbacks(comp *protocol.Component, node *renderer.Ren
 		bFn := bindingCallbacks[eventName]
 		eAction := comp.Props.On[eventName]
 
-		cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, eventName, func(data string) {
+		// Build the raw handler
+		handler := func(data string) {
 			if bFn != nil {
 				bFn(data)
 			}
 			if eAction != nil {
 				s.executeEventAction(eAction, data)
 			}
-		})
+		}
+
+		// Wrap with throttle/debounce if configured
+		if eAction != nil && (eAction.Throttle > 0 || eAction.Debounce > 0) {
+			key := comp.ComponentID + ":" + eventName
+			// Clean up old throttler for this key
+			if s.throttlers != nil {
+				if old, exists := s.throttlers[key]; exists {
+					old.Stop()
+				}
+			} else {
+				s.throttlers = make(map[string]*Throttler)
+			}
+			mode := "throttle"
+			interval := eAction.Throttle
+			if eAction.Debounce > 0 {
+				mode = "debounce"
+				interval = eAction.Debounce
+			}
+			t := NewThrottler(interval, mode)
+			s.throttlers[key] = t
+			rawHandler := handler
+			handler = func(data string) {
+				t.Call(func() { rawHandler(data) })
+			}
+		}
+
+		cbID := s.rend.RegisterCallback(s.id, comp.ComponentID, eventName, handler)
 		node.Callbacks[eventName] = cbID
 		s.trackCallback(comp.ComponentID, eventName, cbID)
 	}

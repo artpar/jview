@@ -5,6 +5,7 @@ import (
 	"canopy/renderer"
 	"strings"
 	"testing"
+	"time"
 )
 
 // feedMessages parses JSONL and feeds to session. Returns after all processed.
@@ -2017,6 +2018,43 @@ func TestOnMessageWithAction(t *testing.T) {
 
 	if firedEvent != "windowClosed" {
 		t.Errorf("firedEvent = %q, want windowClosed", firedEvent)
+	}
+}
+
+func TestSystemTimerFires(t *testing.T) {
+	mock := renderer.NewMockRenderer()
+	disp := &renderer.MockDispatcher{}
+	sess := NewSession(mock, disp)
+
+	feedMessages(t, sess, `{"type":"createSurface","surfaceId":"s1","title":"T"}
+{"type":"updateDataModel","surfaceId":"s1","ops":[{"op":"add","path":"/tick","value":0}]}
+{"type":"on","surfaceId":"s1","id":"timer-1","event":"system.timer","config":{"interval":50},"handler":{"dataPath":"/tick"}}`)
+
+	// Wait for at least 2 ticks
+	time.Sleep(150 * time.Millisecond)
+
+	// Unsubscribe to stop the timer
+	feedMessages(t, sess, `{"type":"off","id":"timer-1"}`)
+
+	// Check that /tick was updated
+	sess.mu.Lock()
+	surf, ok := sess.surfaces["s1"]
+	sess.mu.Unlock()
+	if !ok {
+		t.Fatal("surface not found")
+	}
+	val, found := surf.dm.Get("/tick")
+	if !found {
+		t.Fatal("/tick not found")
+	}
+	// The value should be a map with "tick" and "elapsed" keys from the timer data
+	tickMap, ok := val.(map[string]interface{})
+	if !ok {
+		t.Fatalf("/tick is %T, want map (timer data)", val)
+	}
+	tickNum, _ := tickMap["tick"].(float64)
+	if tickNum < 2 {
+		t.Errorf("tick count = %v, want >= 2", tickNum)
 	}
 }
 

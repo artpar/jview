@@ -3,8 +3,11 @@ package engine
 import (
 	"canopy/jlog"
 	"canopy/protocol"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 )
 
 // EventSubscription represents a single event subscription from an "on" message.
@@ -59,10 +62,68 @@ func (em *EventManager) Subscribe(msg protocol.OnMessage) error {
 		Handler:   msg.Handler,
 	}
 
+	// Start system event source if applicable
+	em.startEventSource(sub, msg.Config)
+
 	em.subs[id] = sub
 
 	jlog.Infof("events", msg.SurfaceID, "subscribed: id=%s event=%s", id, msg.Event)
 	return nil
+}
+
+// startEventSource starts the background process for system events that need active monitoring.
+// Sets sub.Cancel to stop the source when the subscription is removed.
+func (em *EventManager) startEventSource(sub *EventSubscription, config map[string]interface{}) {
+	if !strings.HasPrefix(sub.Event, "system.") {
+		return
+	}
+
+	switch sub.Event {
+	case "system.timer":
+		em.startTimer(sub, config)
+	}
+}
+
+// startTimer starts a periodic timer that fires the subscription's event.
+func (em *EventManager) startTimer(sub *EventSubscription, config map[string]interface{}) {
+	intervalMs := 1000 // default 1 second
+	if config != nil {
+		if v, ok := config["interval"]; ok {
+			switch iv := v.(type) {
+			case float64:
+				intervalMs = int(iv)
+			case json.Number:
+				if n, err := iv.Int64(); err == nil {
+					intervalMs = int(n)
+				}
+			}
+		}
+	}
+	if intervalMs < 10 {
+		intervalMs = 10 // minimum 10ms to prevent spin
+	}
+
+	done := make(chan struct{})
+	sub.Cancel = func() { close(done) }
+
+	surfaceID := sub.SurfaceID
+	event := sub.Event
+
+	go func() {
+		ticker := time.NewTicker(time.Duration(intervalMs) * time.Millisecond)
+		defer ticker.Stop()
+		tick := 0
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				tick++
+				data := fmt.Sprintf(`{"tick":%d,"elapsed":%d}`, tick, tick*intervalMs)
+				em.Fire(event, surfaceID, data)
+			}
+		}
+	}()
 }
 
 // Unsubscribe removes an event subscription by ID.
