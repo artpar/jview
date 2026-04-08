@@ -43,13 +43,14 @@ From here, the core concepts build on each other:
 1. **[Data Binding](data-binding)** -- Connect components to a shared data model so changes propagate automatically.
 2. **[Expressions](expressions)** -- Compute values dynamically using path references and function calls.
 3. **[Actions](actions)** -- Respond to user input with events (server-bound) or function calls (client-bound).
-4. **[Styling](styling)** -- Control colors, fonts, sizes, and layout with the `style` object.
-5. **[Reusable Components](reusable-components)** -- Define component templates and instantiate them with parameters.
-6. **[Reusable Functions](reusable-functions)** -- Define parametric functions for repeated logic.
-7. **[Processes](processes)** -- Spawn background workers with their own transports.
-8. **[Channels](channels)** -- Publish/subscribe communication between processes.
-9. **[Theming](theming)** -- Switch between light, dark, and system themes.
-10. **[App Modes](app-modes)** -- Run as a normal app, menubar tray, or background process.
-11. **[Validation](validation)** -- Validate form fields with built-in rules.
-12. **[Drag and Drop](drag-and-drop)** -- Accept file and text drops on any component.
-13. **[Bundling & Distribution](bundling)** -- Create standalone `.app` bundles with codesigning and notarization.
+4. **[Events](events)** -- Handle native events: mouse, keyboard, gestures, window lifecycle, system state, timers, and more.
+5. **[Styling](styling)** -- Control colors, fonts, sizes, and layout with the `style` object.
+6. **[Reusable Components](reusable-components)** -- Define component templates and instantiate them with parameters.
+7. **[Reusable Functions](reusable-functions)** -- Define parametric functions for repeated logic.
+8. **[Processes](processes)** -- Spawn background workers with their own transports.
+9. **[Channels](channels)** -- Publish/subscribe communication between processes.
+10. **[Theming](theming)** -- Switch between light, dark, and system themes.
+11. **[App Modes](app-modes)** -- Run as a normal app, menubar tray, or background process.
+12. **[Validation](validation)** -- Validate form fields with built-in rules.
+13. **[Drag and Drop](drag-and-drop)** -- Accept file and text drops on any component.
+14. **[Bundling & Distribution](bundling)** -- Create standalone `.app` bundles with codesigning and notarization.

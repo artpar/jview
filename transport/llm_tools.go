@@ -716,6 +716,62 @@ For server-side actions (sending events back to the LLM), use this structure ins
   }
 }
 
+NATIVE EVENTS (generic "on" prop):
+Any component can handle ANY native event via the "on" prop. Named props (onClick, onChange, etc.) still work for simple cases, but "on" gives access to the full event surface.
+
+"on" prop structure — map of event name to handler:
+"on": {
+  "mouseEnter": {"dataPath": "/ui/hovered", "dataValue": "card1"},
+  "mouseLeave": {"dataPath": "/ui/hovered", "dataValue": null},
+  "keyDown": {"filter": {"key": "Enter", "modifiers": ["cmd"]}, "action": {"event": {"name": "submit"}}},
+  "doubleClick": {"action": {"functionCall": {"call": "updateDataModel", "args": {"ops": [...]}}}}
+}
+
+Handler fields:
+- dataPath: JSON Pointer — writes to data model when event fires (simplest handler — no action needed)
+- dataValue: value to write at dataPath (omit to write native event data like {"x":10,"y":20})
+- action: same Action structure as onClick (event, functionCall, or standardAction)
+- filter: match conditions — {"key":"s","modifiers":["cmd"]} for keyboard, {"button":1} for right-click
+- throttle: max fire rate in ms (e.g. 100 = at most once per 100ms)
+- debounce: quiet period in ms (fires only after no events for this duration)
+
+Component events: mouseEnter, mouseLeave, doubleClick, rightClick, focus, blur, keyDown, keyUp, magnify, rotate, scrollWheel
+(plus existing: click, change, toggle, slide, select, dateChange, drop, dismiss, capture, error, ended, search)
+
+Event data shapes (available at /_input or written to dataPath when dataValue is omitted):
+- mouseEnter/Leave: {"x":150.0,"y":200.0}
+- keyDown/keyUp: {"key":"Enter","modifiers":["cmd"],"keyCode":36,"repeat":false}
+- scrollWheel: {"deltaX":0,"deltaY":-3.5,"phase":"changed"}
+- magnify: {"magnification":1.5,"phase":"changed"}
+- rotate: {"rotation":0.5,"phase":"changed"}
+- doubleClick/rightClick: {"x":150.0,"y":200.0}
+
+WINDOW AND SYSTEM EVENTS (on/off messages):
+For events not tied to any component, use on/off protocol messages:
+
+{"type":"on","surfaceId":"main","id":"resize-1","event":"window.resize","handler":{"dataPath":"/window/size"}}
+{"type":"on","id":"save-timer","event":"system.timer","config":{"interval":30000},"handler":{"action":{"event":{"name":"autoSave"}}}}
+{"type":"off","id":"save-timer"}
+
+Window events: window.resize ({"width":W,"height":H}), window.move ({"x":X,"y":Y}), window.beforeClose, window.minimize, window.restore, window.fullscreenEnter, window.fullscreenExit, window.becomeKey, window.resignKey
+
+System events:
+- system.timer — config: {"interval": ms}. Data: {"tick":N,"elapsed":ms}
+- system.appearance — data: {"appearance":"dark"|"light"}
+- system.clipboard.changed — fires when clipboard content changes
+- system.power.sleep / system.power.wake
+- system.fs.watch — config: {"paths":[...]}. Data: {"path":"...","event":"modified"|"created"|"removed"}
+- system.network.reachability — data: {"status":"reachable"|"unreachable"}
+- system.display.changed, system.locale.changed, system.thermal, system.accessibility
+- system.bluetooth, system.location, system.usb (on-demand — started when subscribed)
+
+Common patterns:
+1. Hover: "on":{"mouseEnter":{"dataPath":"/hovered","dataValue":"card1"},"mouseLeave":{"dataPath":"/hovered","dataValue":null}}
+2. Keyboard shortcut: "on":{"keyDown":{"filter":{"key":"s","modifiers":["cmd"]},"action":{"event":{"name":"save"}}}}
+3. Auto-save timer: {"type":"on","id":"autosave","event":"system.timer","config":{"interval":30000},"handler":{"action":{"event":{"name":"autoSave"}}}}
+4. Window resize tracking: {"type":"on","surfaceId":"main","id":"resize","event":"window.resize","handler":{"dataPath":"/window/size"}}
+5. Debounced search: "on":{"change":{"dataPath":"/searchQuery","debounce":300}}
+
 DYNAMIC VALUES:
 Anywhere a "value" appears in an updateDataModel op, it can be one of:
 

@@ -167,3 +167,48 @@ Valid themes: `"light"`, `"dark"`, `"system"`.
 | Modal | `onDismiss` | Modal dismissed |
 | Video | `onEnded` | Playback ends |
 | Any component | `onDrop` | File/text dropped |
+| **Any component** | **`on`** | **Any native event** (see [Events guide](events.md)) |
+
+## DataPath Shorthand
+
+Most event handlers just write a value to the data model. Instead of a verbose `functionCall.updateDataModel`, use `dataPath`:
+
+```json
+"on": {
+  "mouseEnter": {"dataPath": "/hovered", "dataValue": true},
+  "mouseLeave": {"dataPath": "/hovered", "dataValue": false}
+}
+```
+
+When `dataValue` is omitted, the native event data is written (e.g. `{"x": 150, "y": 200}` for mouse events).
+
+## Event Filtering
+
+Filter which events trigger the handler. Useful for keyboard shortcuts:
+
+```json
+"on": {
+  "keyDown": {
+    "filter": {"key": "s", "modifiers": ["cmd"]},
+    "action": {"event": {"name": "save"}}
+  }
+}
+```
+
+Filter fields: `key` (key name), `modifiers` (`"cmd"`, `"shift"`, `"option"`, `"ctrl"`), `button` (0=left, 1=right, 2=middle).
+
+## Throttle and Debounce
+
+Rate-limit high-frequency event handlers:
+
+```json
+"on": {
+  "scrollWheel": {"dataPath": "/scroll", "throttle": 100},
+  "change": {"dataPath": "/searchQuery", "debounce": 300}
+}
+```
+
+- **throttle** (ms): fire at most once per interval
+- **debounce** (ms): wait for quiet period, then fire with the last event's data
+
+See the [Events guide](events.md) for the full event catalog, window events, and system events.

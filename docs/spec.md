@@ -630,6 +630,40 @@ Sets window properties after creation.
 | minWidth | int | 0 | Minimum window width in points |
 | minHeight | int | 0 | Minimum window height in points |
 
+### on
+
+Subscribe to window or system events not tied to a specific component.
+
+```json
+{
+  "type": "on",
+  "surfaceId": "main",
+  "id": "resize-1",
+  "event": "window.resize",
+  "handler": {"dataPath": "/window/size"}
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| surfaceId | string | no | Surface to scope the subscription to (empty = app-level) |
+| id | string | no | Subscription identifier for later removal (auto-generated if omitted) |
+| event | string | yes | Event name (e.g. `window.resize`, `system.timer`) |
+| config | object | no | Source-specific configuration (e.g. `{"interval": 1000}` for timer) |
+| handler | EventAction | yes | Handler to execute when event fires (see Extended EventAction) |
+
+### off
+
+Remove a previously registered event subscription.
+
+```json
+{"type": "off", "id": "resize-1"}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | yes | Subscription ID to remove |
+
 ---
 
 ## Component Model
@@ -681,6 +715,26 @@ Any component can declare a `contextMenu` array in `props`. Items use the same `
 | contextMenu | MenuItem[] | Array of menu items shown on right-click. Same structure as `updateMenu` items. |
 
 For OutlineView: the right-clicked row is selected before the menu appears, so the selection callback fires first with the clicked item's ID.
+
+### Generic `on` Prop
+
+Any component can handle native events via the `on` prop — a map of event names to `EventAction` handlers. Named props (`onClick`, `onChange`, etc.) are syntactic sugar that fold into the `on` map. When both exist, `on` entries take precedence.
+
+```json
+{
+  "componentId": "card1",
+  "type": "Card",
+  "props": {
+    "on": {
+      "mouseEnter": {"dataPath": "/hovered", "dataValue": "card1"},
+      "mouseLeave": {"dataPath": "/hovered", "dataValue": null},
+      "keyDown": {"filter": {"key": "Enter", "modifiers": ["cmd"]}, "action": {"event": {"name": "submit"}}}
+    }
+  }
+}
+```
+
+**Component events:** mouseEnter, mouseLeave, doubleClick, rightClick, focus, blur, keyDown, keyUp, magnify, rotate, scrollWheel — plus all existing events (click, change, toggle, slide, select, dateChange, drop, dismiss, capture, error, ended, search).
 
 ### ChildList
 
@@ -1053,6 +1107,36 @@ Surface-level styling on `createSurface`:
 
 ## Actions
 
+### EventAction (handler wrapper)
+
+All event props (`onClick`, `on.mouseEnter`, `on`/`off` message handlers) use the `EventAction` type:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| action | Action | The action to execute (event, functionCall, or standardAction) |
+| dataPath | string | JSON Pointer — write to data model when event fires |
+| dataValue | any | Value to write at dataPath (omit to write native event data) |
+| filter | EventFilter | Conditions that must match for handler to fire |
+| throttle | int | Max fire rate in milliseconds |
+| debounce | int | Quiet period in milliseconds before firing |
+| preventDefault | bool | Consume the event (prevent default behavior) |
+
+`dataPath` is the simplest handler form — 80% of hover/focus handlers just flip a value in the data model:
+
+```json
+"on": {"mouseEnter": {"dataPath": "/hovered", "dataValue": true}}
+```
+
+### EventFilter
+
+| Field | Type | Description |
+|-------|------|-------------|
+| key | string | Key name: `"Enter"`, `"Escape"`, `"a"`, `"ArrowDown"`, `"Space"`, `"Tab"`, `"F1"`–`"F12"` |
+| modifiers | string[] | Required modifiers: `"cmd"`, `"shift"`, `"option"`, `"ctrl"` |
+| button | int | Mouse button: 0=left, 1=right, 2=middle |
+
+### Action (inner dispatch)
+
 An action has two mutually exclusive forms: **event** (server-bound) and **functionCall** (client-bound).
 
 ### Event Action
@@ -1110,6 +1194,73 @@ Executes a client-side function. No server round-trip.
 | `setTheme` | `{theme: "light"\|"dark"\|"system"}` | Switch the surface's window theme. No server round-trip. |
 
 Op values in `updateDataModel` are resolved through the evaluator before being applied, so they support the full expression language (path references, nested function calls).
+
+---
+
+## Event Catalog
+
+### Component Events
+
+Events available on the generic `on` prop. Native event data is written to `dataPath` when `dataValue` is omitted, or available at `/_input`.
+
+| Event | Data Shape | Description |
+|-------|-----------|-------------|
+| click | `""` | Standard click (same as onClick) |
+| change | `"new value"` | Text field value changed |
+| toggle | `"true"\|"false"` | Checkbox toggled |
+| slide | `"75.5"` | Slider value changed |
+| select | `"selected_id"` | Selection changed |
+| mouseEnter | `{"x":N,"y":N}` | Mouse entered component bounds |
+| mouseLeave | `{"x":N,"y":N}` | Mouse left component bounds |
+| doubleClick | `{"x":N,"y":N,"clickCount":2}` | Double-click |
+| rightClick | `{"x":N,"y":N,"button":1}` | Secondary click |
+| focus | `{}` | Component gained focus |
+| blur | `{}` | Component lost focus |
+| keyDown | `{"key":"Enter","modifiers":["cmd"],"keyCode":36,"repeat":false}` | Key pressed |
+| keyUp | `{"key":"Enter","modifiers":["cmd"],"keyCode":36,"repeat":false}` | Key released |
+| magnify | `{"magnification":1.5,"phase":"changed"}` | Pinch-to-zoom gesture |
+| rotate | `{"rotation":0.5,"phase":"changed"}` | Two-finger rotation gesture |
+| scrollWheel | `{"deltaX":0,"deltaY":-3.5,"phase":"changed"}` | Scroll wheel / trackpad scroll |
+
+### Window Events (via `on`/`off` messages)
+
+| Event | Data Shape | Description |
+|-------|-----------|-------------|
+| window.resize | `{"width":N,"height":N}` | Window resized |
+| window.move | `{"x":N,"y":N}` | Window moved |
+| window.beforeClose | `{}` | Window close requested (handler can cancel) |
+| window.close | `{}` | Window closed |
+| window.minimize | `{}` | Window minimized |
+| window.restore | `{}` | Window restored from minimize |
+| window.fullscreenEnter | `{}` | Entered fullscreen |
+| window.fullscreenExit | `{}` | Exited fullscreen |
+| window.becomeKey | `{}` | Window became key (focused) |
+| window.resignKey | `{}` | Window lost key focus |
+| window.becomeMain | `{}` | Window became main |
+| window.resignMain | `{}` | Window lost main status |
+| window.occlude | `{"visible":bool}` | Window visibility changed |
+
+### System Events (via `on`/`off` messages)
+
+| Event | Config | Data Shape | Description |
+|-------|--------|-----------|-------------|
+| system.timer | `{"interval":ms}` | `{"tick":N,"elapsed":ms}` | Periodic timer |
+| system.appearance | — | `{"appearance":"dark"\|"light"}` | System dark/light mode changed |
+| system.power.sleep | — | `{"state":"sleep"}` | System going to sleep |
+| system.power.wake | — | `{"state":"wake"}` | System woke up |
+| system.clipboard.changed | — | `{}` | Clipboard content changed |
+| system.fs.watch | `{"paths":["..."]}` | `{"path":"...","event":"modified"\|"created"\|"removed"}` | File system change |
+| system.network.reachability | — | `{"status":"reachable"\|"unreachable","type":"wifi"}` | Network connectivity changed |
+| system.display.changed | — | `{"screenCount":N,"mainWidth":N,"mainHeight":N}` | Display configuration changed |
+| system.locale.changed | — | `{"locale":"en_US"}` | System locale changed |
+| system.thermal | — | `{"state":"nominal"\|"fair"\|"serious"\|"critical"}` | Thermal state changed |
+| system.accessibility | — | `{"reduceMotion":bool,"reduceTransparency":bool,"increaseContrast":bool}` | Accessibility settings changed |
+| system.bluetooth | — | `{"state":"poweredOn"\|"poweredOff"\|"unauthorized"}` | Bluetooth state changed (on-demand) |
+| system.location | — | `{"latitude":N,"longitude":N,"altitude":N,"accuracy":N}` | Location updated (on-demand) |
+| system.usb | — | `{"action":"connected"\|"disconnected","name":"...","vendorId":N,"productId":N}` | USB device change (on-demand) |
+| system.ipc.distributed | `{"name":"com.example.Notif"}` | `{"name":"...","userInfo":{}}` | Distributed notification from another app |
+
+On-demand events (bluetooth, location, usb) are started when the first subscription arrives and stopped when the last is removed.
 
 ---
 
