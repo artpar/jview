@@ -1,8 +1,12 @@
 package engine
 
 import (
-	"fmt"
+	"canopy/jlog"
 	"canopy/protocol"
+	"canopy/renderer"
+	"fmt"
+	"os"
+	"strings"
 	"sync"
 )
 
@@ -14,6 +18,11 @@ type ProcessTransport interface {
 	Start()
 	Stop()
 	SendAction(surfaceID string, event *protocol.EventDef, data map[string]interface{})
+}
+
+// TestResultSender is implemented by transports that need test results back (e.g. LLMTransport).
+type TestResultSender interface {
+	SendTestResult(result string)
 }
 
 // TransportFactory creates a transport from a process transport config.
@@ -32,13 +41,15 @@ type ProcessManager struct {
 	mu        sync.Mutex
 	processes map[string]*Process
 	sess      *Session
+	rend      renderer.Renderer
 	factory   TransportFactory
 }
 
-func NewProcessManager(sess *Session, factory TransportFactory) *ProcessManager {
+func NewProcessManager(sess *Session, rend renderer.Renderer, factory TransportFactory) *ProcessManager {
 	return &ProcessManager{
 		processes: make(map[string]*Process),
 		sess:      sess,
+		rend:      rend,
 		factory:   factory,
 	}
 }
@@ -75,7 +86,7 @@ func (pm *ProcessManager) Create(cp protocol.CreateProcess) error {
 		})
 	})
 
-	go proc.run(pm.sess, pm)
+	go proc.run(pm.sess, pm.rend, pm)
 	return nil
 }
 
@@ -179,7 +190,7 @@ func (pm *ProcessManager) setStatus(processID, status string) {
 }
 
 // run is the process goroutine. Reads from transport and routes to session.
-func (p *Process) run(sess *Session, pm *ProcessManager) {
+func (p *Process) run(sess *Session, rend renderer.Renderer, pm *ProcessManager) {
 	defer logRecover("process", "", p.ID)
 
 	p.transport.Start()
@@ -206,7 +217,26 @@ func (p *Process) run(sess *Session, pm *ProcessManager) {
 				sess.FlushPendingComponents()
 				continue
 			}
+			// Execute test messages and return real results to the transport
+			if msg.Type == protocol.MsgTest {
+				sess.FlushPendingComponents()
+				tm := msg.Body.(protocol.TestMessage)
+				result := ExecuteTestLite(sess, rend, tm)
+				if trs, ok := p.transport.(TestResultSender); ok {
+					trs.SendTestResult(FormatTestResult(result))
+				}
+				continue
+			}
 			sess.HandleMessage(msg)
+			// Persist recordable messages from LLM transports to source file
+			// Skip follow-up processes — their changes are ephemeral
+			if _, ok := p.transport.(TestResultSender); ok {
+				if strings.HasPrefix(p.ID, "followup_") {
+					jlog.Infof("process", "", "skipping persist for follow-up process %q (msg type: %s)", p.ID, msg.Type)
+				} else {
+					PersistToSourceFile(sess, msg)
+				}
+			}
 		case err, ok := <-errCh:
 			if !ok {
 				// Errors channel closed — nil it out to stop selecting on it.
@@ -217,4 +247,20 @@ func (p *Process) run(sess *Session, pm *ProcessManager) {
 			logError("process", "", fmt.Sprintf("process %s error: %v", p.ID, err))
 		}
 	}
+}
+
+// PersistToSourceFile appends a recordable message's raw JSONL to the session's source file.
+func PersistToSourceFile(sess *Session, msg *protocol.Message) {
+	sourceFile := sess.SourceFile()
+	if sourceFile == "" || !isRecordable(msg.Type) || len(msg.RawLine) == 0 {
+		return
+	}
+	f, err := os.OpenFile(sourceFile, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		jlog.Errorf("process", "", "persist to %s: %v", sourceFile, err)
+		return
+	}
+	defer f.Close()
+	f.Write(msg.RawLine)
+	f.Write([]byte("\n"))
 }

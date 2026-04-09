@@ -142,7 +142,7 @@ func main() {
 
 	ffiConfigPath := flag.String("ffi-config", "", "Path to FFI convention file (JSON) for native function calls")
 	llmProvider := flag.String("llm", "anthropic", "LLM provider: anthropic, openai, gemini, ollama, deepseek, groq, mistral")
-	model := flag.String("model", "claude-opus-4-6", "Model name (default: claude-opus-4-6)")
+	model := flag.String("model", "claude-haiku-4-5-20251001", "Model name (default: claude-haiku-4-5-20251001)")
 	prompt := flag.String("prompt", "", "Prompt describing the UI to build")
 	mode := flag.String("mode", "tools", "LLM mode: tools (default) or raw")
 	apiKey := flag.String("api-key", "", "API key (overrides environment variable)")
@@ -177,6 +177,7 @@ func main() {
 	var tr transport.Transport
 	var llmTr *transport.LLMTransport        // non-nil when using LLM transport
 	var ccTr *transport.ClaudeCodeTransport   // non-nil when using Claude Code transport
+	var sourceFile string                     // main JSONL file for persisting LLM changes
 	var generateDone chan struct{}            // closed when generate-only can exit
 	var cacheFinalized chan struct{}          // closed when cache finalization completes
 
@@ -238,6 +239,7 @@ func main() {
 		}
 	} else if len(args) > 0 && *prompt == "" {
 		// File or directory mode: positional arg with no --prompt
+		sourceFile = resolveSourceFile(args[0])
 		if *watch {
 			tr = transport.NewWatchTransport(args[0])
 		} else {
@@ -472,6 +474,9 @@ func main() {
 	if recorder != nil {
 		sess.SetRecorder(recorder)
 	}
+	if sourceFile != "" {
+		sess.SetSourceFile(sourceFile)
+	}
 
 	// Pre-declare pm and cm so the process factory closure can capture them
 	var pm *engine.ProcessManager
@@ -479,9 +484,12 @@ func main() {
 	var activeProcessLLM *transport.LLMTransport
 
 	// Set up process manager with transport factory
-	pm = engine.NewProcessManager(sess, func(cfg protocol.ProcessTransportConfig) (engine.ProcessTransport, error) {
+	pm = engine.NewProcessManager(sess, rend, func(cfg protocol.ProcessTransportConfig) (engine.ProcessTransport, error) {
 		switch cfg.Type {
 		case "file":
+			if sf := resolveSourceFile(cfg.Path); sf != "" {
+				sess.SetSourceFile(sf)
+			}
 			return createFileTransportOrError(cfg.Path)
 		case "interval":
 			if cfg.Interval <= 0 {
@@ -894,6 +902,11 @@ func main() {
 				// when a non-updateComponents message triggers a flush.
 				if msg.Type == protocol.MsgUpdateComponents && llmTr != nil {
 					sess.HandleMessage(msg) // just buffers in pendingComponents
+					if !llmTr.IsFollowUpTurn {
+						engine.PersistToSourceFile(sess, msg)
+					} else {
+						jlog.Infof("main", "", "skipping persist for follow-up turn (msg type: %s)", msg.Type)
+					}
 					uc := msg.Body.(protocol.UpdateComponents)
 					llmTr.LayoutResultCh <- fmt.Sprintf("ok — %d components buffered", len(uc.Components))
 					continue
@@ -1012,6 +1025,38 @@ func createFileTransportOrError(path string) (transport.Transport, error) {
 	return transport.NewDirTransport(path, files), nil
 }
 
+// resolveSourceFile returns the main JSONL file path for a given file or directory.
+// Used to determine where LLM agent changes should be appended.
+func resolveSourceFile(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		return ""
+	}
+	if !info.IsDir() {
+		return abs
+	}
+	for _, entry := range []string{"app.jsonl", "main.jsonl"} {
+		ep := filepath.Join(abs, entry)
+		if _, err := os.Stat(ep); err == nil {
+			return ep
+		}
+	}
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".jsonl" {
+			return filepath.Join(abs, e.Name())
+		}
+	}
+	return ""
+}
+
 // createFileTransport wraps createFileTransportOrError for CLI startup (fatal on error).
 func createFileTransport(path string) transport.Transport {
 	tr, err := createFileTransportOrError(path)
@@ -1077,7 +1122,14 @@ func buildFollowUpPrompt(sess *engine.Session, userText string) string {
 
 	sb.WriteString("The user wants you to make this change: ")
 	sb.WriteString(userText)
-	sb.WriteString("\n\nModify the existing components using updateComponents. Do NOT recreate the surface or rebuild the entire UI — only change what is needed.")
+	sb.WriteString(`
+
+Modify the existing components using updateComponents. STRICT RULES:
+- NEVER change the type of an existing component (e.g. do not change a Row to a Column)
+- NEVER remove children from existing containers — only add new children or update existing ones
+- NEVER call createSurface — the surface already exists
+- Do NOT rebuild the entire UI — only change what is specifically needed
+- Take ONE screenshot to verify, then run tests with a2ui_testBatch, then STOP`)
 	return sb.String()
 }
 
@@ -1133,7 +1185,7 @@ func runMCP(args []string) {
 	sess.SetNativeProvider(darwin.NewNativeProvider())
 
 	// Set up process manager for MCP mode
-	pm := engine.NewProcessManager(sess, func(cfg protocol.ProcessTransportConfig) (engine.ProcessTransport, error) {
+	pm := engine.NewProcessManager(sess, rend, func(cfg protocol.ProcessTransportConfig) (engine.ProcessTransport, error) {
 		switch cfg.Type {
 		case "file":
 			return transport.NewFileTransport(cfg.Path), nil
@@ -1228,6 +1280,9 @@ func runMCP(args []string) {
 
 	// If a file arg is provided, load it as initial UI
 	if len(args) > 0 {
+		if sf := resolveSourceFile(args[0]); sf != "" {
+			sess.SetSourceFile(sf)
+		}
 		tr := createFileTransport(args[0])
 		go func() {
 			defer func() {

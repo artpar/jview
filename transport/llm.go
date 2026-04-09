@@ -183,6 +183,10 @@ type LLMTransport struct {
 	// followUps receives user follow-up prompts (e.g. from Cmd+L).
 	followUps chan string
 
+	// IsFollowUpTurn indicates the current generation is a follow-up modification.
+	// Follow-up changes should not be persisted to the source file.
+	IsFollowUpTurn bool
+
 	// cl logs all request/response payloads to disk.
 	cl *convLogger
 }
@@ -231,8 +235,15 @@ func (t *LLMTransport) Stop() {
 	})
 }
 
+// SendTestResult sends a test result back to the transport's agentic loop.
+// Implements engine.TestResultSender so the ProcessManager can deliver real test results.
+func (t *LLMTransport) SendTestResult(result string) {
+	t.TestResultCh <- result
+}
+
 // SendFollowUp sends a user follow-up prompt (e.g. from Cmd+L) as a new conversation turn.
 func (t *LLMTransport) SendFollowUp(prompt string) {
+	t.IsFollowUpTurn = true
 	select {
 	case t.followUps <- prompt:
 	case <-t.done:
@@ -603,7 +614,15 @@ func (t *LLMTransport) loopIteration(ctx context.Context, state *LoopState) (*Lo
 				budget = *state.MaxOutputTokensOverride
 			}
 
-			decision := checkTokenBudget(state.BudgetTracker, budget, state.GlobalTurnTokens)
+			decision := checkTokenBudget(state.BudgetTracker, budget, state.GlobalTurnTokens, state.ToolCallTurnCount)
+			if decision.Action == BudgetStop && state.ToolCallTurnCount >= 3 {
+				pct := 0
+				if budget > 0 {
+					pct = (state.GlobalTurnTokens * 100) / budget
+				}
+				jlog.Infof("transport", "", "budget nudge suppressed: %d%% (%d / %d) after %d tool-call turns",
+					pct, state.GlobalTurnTokens, budget, state.ToolCallTurnCount)
+			}
 			if decision.Action == BudgetContinue {
 				state.Messages = append(state.Messages, NewMetaMessage(decision.NudgeMsg))
 				state.Transition = &Transition{
@@ -674,6 +693,7 @@ func (t *LLMTransport) loopIteration(ctx context.Context, state *LoopState) (*Lo
 	state.BudgetTracker = nil
 	state.GlobalTurnTokens = 0
 	state.TurnCount++
+	state.ToolCallTurnCount++
 
 	// Gap I: Post-compact turn tracking
 	// Reference: query.ts:1523-1533

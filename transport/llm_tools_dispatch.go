@@ -2,9 +2,11 @@ package transport
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"canopy/jlog"
 	"canopy/protocol"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,7 +50,8 @@ var toolRegistry = map[string]ToolDef{
 	"a2ui_getLogs":        {Name: "getLogs", IsUtility: true, IsReadOnly: true, IsConcurrencySafe: true},
 
 	// Read-only protocol tools
-	"a2ui_test": {Name: "test", IsReadOnly: true, IsConcurrencySafe: true},
+	"a2ui_test":      {Name: "test", IsReadOnly: true, IsConcurrencySafe: true},
+	"a2ui_testBatch": {Name: "testBatch", IsReadOnly: true, IsConcurrencySafe: true},
 
 	// State-mutating protocol tools (must run serially)
 	"a2ui_createSurface":    {Name: "createSurface"},
@@ -224,6 +227,11 @@ func (t *LLMTransport) executeToolCall(ctx context.Context, tc anyllm.ToolCall) 
 
 // executeProtocolToolCall handles protocol tools that produce A2UI messages.
 func (t *LLMTransport) executeProtocolToolCall(ctx context.Context, tc anyllm.ToolCall) ToolCallResult {
+	// Batch test: handle before toolCallToMessage since it has a different schema
+	if tc.Function.Name == "a2ui_testBatch" {
+		return t.executeTestBatchToolCall(tc)
+	}
+
 	msg, _, err := toolCallToMessage(tc)
 	if err != nil {
 		jlog.Warnf("transport", "", "tool call parse error: %v", err)
@@ -261,14 +269,64 @@ func (t *LLMTransport) executeTestToolCall(toolCallID string, msg *protocol.Mess
 	var result string
 	select {
 	case result = <-t.TestResultCh:
-	case <-time.After(5 * time.Second):
-		result = "PASS (headless mode — no renderer available for live assertions)"
+	case <-time.After(30 * time.Second):
+		panic("a2ui_test: no test result received within 30s — test consumer is not connected")
 	case <-t.done:
 		return ToolCallResult{ToolCallID: toolCallID, Content: "error: aborted", IsError: true}
 	}
 
 	jlog.Infof("transport", "", "test result: %s", result)
 	return ToolCallResult{ToolCallID: toolCallID, Content: result}
+}
+
+// executeTestBatchToolCall runs multiple test cases in a single tool call.
+func (t *LLMTransport) executeTestBatchToolCall(tc anyllm.ToolCall) ToolCallResult {
+	var args struct {
+		SurfaceID string `json:"surfaceId"`
+		Tests     []struct {
+			Name  string            `json:"name"`
+			Steps []json.RawMessage `json:"steps"`
+		} `json:"tests"`
+	}
+	if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+		return ToolCallResult{ToolCallID: tc.ID, Content: fmt.Sprintf("error: %v", err), IsError: true}
+	}
+
+	jlog.Infof("transport", "", "testBatch: running %d tests on surface %q", len(args.Tests), args.SurfaceID)
+	var results []string
+	for _, test := range args.Tests {
+		// Build a synthetic single-test tool call and convert via toolCallToMessage
+		singleArgs, _ := json.Marshal(map[string]any{
+			"surfaceId": args.SurfaceID,
+			"name":      test.Name,
+			"steps":     test.Steps,
+		})
+		singleTC := anyllm.ToolCall{
+			ID: tc.ID,
+			Function: anyllm.FunctionCall{
+				Name:      "a2ui_test",
+				Arguments: string(singleArgs),
+			},
+		}
+		msg, _, err := toolCallToMessage(singleTC)
+		if err != nil {
+			results = append(results, fmt.Sprintf("ERROR: %q — %v", test.Name, err))
+			continue
+		}
+		result := t.executeTestToolCall(tc.ID, msg)
+		results = append(results, result.Content)
+	}
+
+	passed, failed := 0, 0
+	for _, r := range results {
+		if strings.HasPrefix(r, "PASSED") {
+			passed++
+		} else {
+			failed++
+		}
+	}
+	jlog.Infof("transport", "", "testBatch: %d passed, %d failed", passed, failed)
+	return ToolCallResult{ToolCallID: tc.ID, Content: strings.Join(results, "\n")}
 }
 
 // waitForLayoutFeedback waits for layout feedback from the consumer goroutine.

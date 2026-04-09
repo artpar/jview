@@ -50,25 +50,13 @@ func a2uiTools() []anyllm.Tool {
 								"type": "object",
 								"properties": map[string]any{
 									"componentId": map[string]any{"type": "string"},
-									"type":        map[string]any{"type": "string", "enum": []string{"Text", "Row", "Column", "Card", "Button", "TextField", "CheckBox", "Slider", "Image", "Icon", "Divider", "List", "Tabs", "Modal", "ChoicePicker", "DateTimeInput", "SplitView", "OutlineView", "RichTextEditor", "SearchField"}},
+									"type":        map[string]any{"type": "string", "enum": protocol.AllComponentTypes()},
 									"children":    map[string]any{"type": "object", "description": "Tree structure: {\"static\": [\"childId1\", \"childId2\"]}. Required on containers."},
 									"props":       map[string]any{"type": "object"},
 									"style": map[string]any{
 										"type":        "object",
 										"description": "Visual styling overrides. All values accept literals OR dynamic values ({\"path\":\"/x\"} or {\"functionCall\":{...}}).",
-										"properties": map[string]any{
-											"backgroundColor": map[string]any{"description": "Background color (#RRGGBB) or dynamic value"},
-											"textColor":       map[string]any{"description": "Text color (#RRGGBB) or dynamic value"},
-											"cornerRadius":    map[string]any{"description": "Corner radius in points (number or dynamic value)"},
-											"width":           map[string]any{"description": "Fixed width in points (number or dynamic value)"},
-											"height":          map[string]any{"description": "Fixed height in points (number or dynamic value)"},
-											"fontSize":        map[string]any{"description": "Font size in points (number or dynamic value)"},
-											"fontWeight":      map[string]any{"description": "Font weight: \"bold\"|\"semibold\"|\"medium\"|\"light\" (or dynamic value)"},
-											"fontFamily":      map[string]any{"description": "Font family name (system or registered via a2ui_loadAssets, or dynamic value)"},
-											"textAlign":       map[string]any{"description": "Text alignment: \"left\"|\"center\"|\"right\" (or dynamic value)"},
-											"opacity":         map[string]any{"description": "Opacity 0.0-1.0 (number or dynamic value)"},
-											"flexGrow":        map[string]any{"description": "Flex grow factor (number or dynamic value). Expands to fill available space in parent stack."},
-										},
+										"properties": stylePropertySchema(),
 									},
 								},
 								"required": []string{"componentId", "type"},
@@ -191,6 +179,53 @@ func a2uiTools() []anyllm.Tool {
 						},
 					},
 					"required": []string{"surfaceId", "name", "steps"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: anyllm.Function{
+				Name:        "a2ui_testBatch",
+				Description: "Run multiple test cases in a single call. Each test has a name and steps array, identical to a2ui_test. Returns all results at once. Use this instead of calling a2ui_test repeatedly.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"surfaceId": map[string]any{"type": "string"},
+						"tests": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"name": map[string]any{"type": "string", "description": "Test case name"},
+									"steps": map[string]any{
+										"type": "array",
+										"items": map[string]any{
+											"type": "object",
+											"properties": map[string]any{
+												"assert":        map[string]any{"type": "string", "enum": []string{"component", "dataModel", "children", "notExists", "count", "action", "layout", "style"}},
+												"simulate":      map[string]any{"type": "string", "enum": []string{"event"}},
+												"componentId":   map[string]any{"type": "string"},
+												"componentType": map[string]any{"type": "string"},
+												"props":         map[string]any{"type": "object"},
+												"path":          map[string]any{"type": "string"},
+												"value":         map[string]any{},
+												"children":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+												"count":         map[string]any{"type": "integer"},
+												"name":          map[string]any{"type": "string"},
+												"data":          map[string]any{"type": "object"},
+												"layout":        map[string]any{"type": "object"},
+												"style":         map[string]any{"type": "object"},
+												"event":         map[string]any{"type": "string"},
+												"eventData":     map[string]any{"type": "string"},
+											},
+										},
+									},
+								},
+								"required": []string{"name", "steps"},
+							},
+						},
+					},
+					"required": []string{"surfaceId", "tests"},
 				},
 			},
 		},
@@ -1099,7 +1134,7 @@ WORKFLOW (order matters):
 7. Call a2ui_updateToolbar to add native toolbar buttons (optional but recommended). Custom actions use the same double-nested format.
 8. Call a2ui_updateComponents MULTIPLE TIMES to build the component tree in batches (after menu/toolbar are ready). See COMPONENT BATCHING below. Each call returns layout coordinates of the rendered components — CHECK THEM for zero-width/zero-height issues.
 9. Call a2ui_takeScreenshot ONCE to visually verify layout. Do NOT take multiple screenshots — one is enough.
-10. Immediately call a2ui_test to write tests (REQUIRED — at least 5 tests covering: initial layout/children, data model state, component props with resolved content, count of forEach-expanded items like noteList, and click simulation to verify data model updates). After tests, you are DONE — do not loop back to screenshots.
+10. Immediately call a2ui_testBatch to write ALL tests in a single call (REQUIRED — at least 5 tests covering: initial layout/children, data model state, component props with resolved content, count of forEach-expanded items like noteList, and click simulation to verify data model updates). Use a2ui_testBatch (not a2ui_test) to run all tests at once. After tests, you are DONE — do not loop back to screenshots.
 
 DO NOT call a2ui_defineFunction for complex logic — use inline function composition and data model lookup tables instead (see DATA MODEL PATTERNS above).
 
@@ -1153,7 +1188,7 @@ SCREENSHOTS:
 Call a2ui_takeScreenshot ONCE after all components are rendered. Do NOT call it multiple times — one screenshot is sufficient. After the screenshot, proceed directly to writing tests.
 
 TESTING (REQUIRED — write at least 8 tests):
-After building a UI, you MUST write tests using a2ui_test to verify correctness. Tests execute IMMEDIATELY and return real PASS/FAIL results. If a test fails, read the error message and fix the issue before continuing. Write tests covering ALL of these: (1) initial layout/children, (2) initial data model state, (3) component props with resolved content, (4) count of forEach-expanded items, (5) click simulation to verify data model updates, (6) resolved text content of key components.
+After building a UI, you MUST write tests using a2ui_testBatch to verify correctness in a SINGLE call. Put ALL test cases in one a2ui_testBatch call — do NOT call a2ui_test repeatedly. Tests execute IMMEDIATELY and return real PASS/FAIL results. If a test fails, read the error message and fix the issue before continuing. Write tests covering ALL of these: (1) initial layout/children, (2) initial data model state, (3) component props with resolved content, (4) count of forEach-expanded items, (5) click simulation to verify data model updates, (6) resolved text content of key components.
 
 forEach-expanded component IDs follow the pattern: {listId}_{templateId}_{index}
 Example: if noteList has templateId "notePreview", the expanded components are:
@@ -1299,4 +1334,14 @@ func handleGetLogs(tc anyllm.ToolCall) string {
 		}
 	}
 	return b.String()
+}
+
+// stylePropertySchema generates JSON Schema properties for DynamicStyleProps
+// via reflection, so new fields auto-appear in the LLM tool schema.
+func stylePropertySchema() map[string]any {
+	props := make(map[string]any)
+	for _, name := range protocol.StylePropertyNames() {
+		props[name] = map[string]any{"description": "Style property (literal or dynamic value)"}
+	}
+	return props
 }

@@ -87,6 +87,10 @@ type LoopState struct {
 	// GlobalTurnTokens is the cumulative output tokens across all continuations this turn.
 	// Reference: query.ts getTurnOutputTokens()
 	GlobalTurnTokens int
+
+	// ToolCallTurnCount tracks how many turns included tool calls.
+	// Used to suppress budget nudging after productive tool-call sequences.
+	ToolCallTurnCount int
 }
 
 // BudgetTracker tracks token budget continuation state across nudge iterations.
@@ -150,8 +154,14 @@ type TokenBudgetDecision struct {
 
 // checkTokenBudget checks if the model should be nudged to continue working.
 // Reference: query/tokenBudget.ts checkTokenBudget
-func checkTokenBudget(tracker *BudgetTracker, budget int, globalTurnTokens int) TokenBudgetDecision {
+func checkTokenBudget(tracker *BudgetTracker, budget int, globalTurnTokens int, toolCallTurnCount int) TokenBudgetDecision {
 	if budget <= 0 {
+		return TokenBudgetDecision{Action: BudgetStop}
+	}
+
+	// After 3+ tool-call turns the model has been productively working.
+	// Let it summarize without nudging.
+	if toolCallTurnCount >= 3 {
 		return TokenBudgetDecision{Action: BudgetStop}
 	}
 
